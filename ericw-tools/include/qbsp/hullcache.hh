@@ -106,6 +106,23 @@ void cells_finish();
  */
 bool chop_world_hulls();
 
+/*
+ * Hull 0 of the world: its final tree (before filling) only depends on the brushes (shapes,
+ * contents, texture flags, order) and on the side marks of qbsp's first pass. Those marks come
+ * from the first filling, which keeps the areas of connected empty space that hold a point
+ * entity (and FillDetail the same with detail as walls). These areas are a property of the
+ * geometry, not of the tree. So with the same brushes and the same set of occupied areas, the
+ * final tree is exactly the one a fresh compile would build: the server keeps it and skips both
+ * BrushBSP passes and the first portals and filling. The filling of the final tree, the faces
+ * (textures!), T-junctions and output are still done every compile.
+ */
+// before hull 0's first BrushBSP: if a stored tree applies, puts it in `tree` and returns true
+bool hull0_reuse(tree_t &tree, mapentity_t &entity, const std::vector<std::shared_ptr<bspbrush_t>> &brushes);
+// after hull 0's first tree and its portals, before its filling: keep it to place the entities
+void hull0_store_first(tree_t &tree);
+// after hull 0's final tree and its portals, before its filling: store both trees
+void hull0_store(tree_t &tree, mapentity_t &entity, const std::vector<std::shared_ptr<bspbrush_t>> &brushes);
+
 // one line per compile: hulls reused / rebuilt
 void print_summary();
 } // namespace hullcache

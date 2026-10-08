@@ -16,6 +16,7 @@
   },
   "quakemash": {
     "attempts": {
+      "entity": 0,
       "geotex": 1,
       "many": 0,
       "move": 0,

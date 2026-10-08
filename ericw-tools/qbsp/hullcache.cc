@@ -15,6 +15,7 @@
 #include <qbsp/writebsp.hh>
 #include <qbsp/brush.hh>
 #include <qbsp/tree.hh>
+#include <qbsp/portals.hh>
 #include <common/log.hh>
 #include <fmt/format.h>
 
@@ -141,14 +142,16 @@ bool enabled()
     return is_enabled;
 }
 
-// drops stored cells last used before `oldest` (defined with the cells, below)
+// drop stored cells / hull 0 trees last used before `oldest` (defined with them, below)
 static void prune_cells(uint64_t oldest);
+static void prune_hull0(uint64_t oldest);
 
 void begin_compile()
 {
     generation++;
     std::erase_if(entries, [](const auto &e) { return e.second.last_used + keep_generations < generation; });
     prune_cells(generation > keep_generations ? generation - keep_generations : 0);
+    prune_hull0(generation > keep_generations ? generation - keep_generations : 0);
     pending_entity = nullptr;
     reused = rebuilt = reused_nodes = 0;
     hull0_filled = false;
@@ -163,6 +166,7 @@ void forget_unused()
 {
     std::erase_if(entries, [](const auto &e) { return e.second.last_used < generation; });
     prune_cells(generation);
+    prune_hull0(generation);
 }
 
 // (the side marks of the last compile stay: they belong to what it used)
@@ -779,6 +783,335 @@ void cells_finish()
     build->prepared = false;
 }
 
+// ---- hull 0 of the world -----------------------------------------------------------------
+
+struct h0_node_t
+{
+    qplane3d plane; // positive (even) plane, the exact values qbsp used
+    int32_t children[2]; // >= 0: node, < 0: leaf -1 - index
+    bool detail_separator;
+};
+
+// a leaf of the final tree (to rebuild it)
+struct h0_leaf_t
+{
+    contentflags_t contents; // before filling
+    std::vector<int32_t> originals; // indices in the brush list given to BrushBSP
+};
+
+// a leaf of the first pass's tree (to find which areas the point entities are in)
+struct h0_first_leaf_t
+{
+    bool seals; // LeafSealsMap
+    int32_t outside_area; // connected empty space as FillOutside floods it (-1: seals)
+    int32_t detail_area; // the same for FillDetail, where detail also seals (-1: seals)
+};
+
+struct hull0_t
+{
+    key_t key;
+    std::vector<key_t> shapes; // the brushes given to BrushBSP, in order
+    // the final tree
+    aabb3d tree_bounds, head_bounds;
+    std::vector<h0_node_t> nodes;
+    std::vector<h0_leaf_t> leaves;
+    int32_t head = 0;
+    // the first pass's tree, only to place the point entities
+    std::vector<h0_node_t> first_nodes;
+    std::vector<h0_first_leaf_t> first_leaves;
+    int32_t first_head = 0;
+    // the areas holding a point entity: they decide the first pass's filling, so its side marks
+    std::vector<int32_t> occupied_outside, occupied_detail; // sorted, unique
+    // brush entities: the side marks of their first pass (FillBrushEntity), which their faces use
+    bool bmodel = false;
+    std::vector<std::vector<bool>> marks; // per map brush of the entity, per face
+    uint64_t last_used = 0;
+};
+
+// by key; a few trees can share a key (same brushes, the entities in other areas)
+static std::unordered_multimap<key_t, hull0_t, key_hash> hull0_trees;
+// the first pass's tree of the compile in progress, until hull0_store()
+static std::unique_ptr<hull0_t> hull0_pending;
+
+static size_t hull0_bmodels_reused = 0;
+
+static void prune_hull0(uint64_t oldest)
+{
+    std::erase_if(hull0_trees, [oldest](const auto &t) { return t.second.last_used < oldest; });
+}
+
+static std::vector<key_t> brush_shapes(const std::vector<std::shared_ptr<bspbrush_t>> &brushes)
+{
+    std::vector<key_t> shapes;
+    shapes.reserve(brushes.size());
+    for (auto &b : brushes) {
+        shapes.push_back(shape_key(*b));
+    }
+    return shapes;
+}
+
+static key_t hull0_key(mapentity_t &entity)
+{
+    // brushes, contents, texture flags, the entity keys (the options are the same for a server's life)
+    return entity_key(entity, 0);
+}
+
+// records a tree's nodes; `leaf` records a leaf and returns its index
+template<typename F>
+static int32_t record_tree(std::vector<h0_node_t> &nodes, const node_t *node, F &&leaf)
+{
+    if (node->get_leafdata()) {
+        return -1 - leaf(node);
+    }
+    auto *nodedata = node->get_nodedata();
+    const int32_t num = static_cast<int32_t>(nodes.size());
+    nodes.emplace_back();
+    const int32_t c0 = record_tree(nodes, nodedata->children[0], leaf);
+    const int32_t c1 = record_tree(nodes, nodedata->children[1], leaf);
+    const qbsp_plane_t &plane = map.get_plane(nodedata->planenum);
+    nodes[num] = {qplane3d{plane.get_normal(), plane.get_dist()}, {c0, c1}, nodedata->detail_separator};
+    return num;
+}
+
+/*
+ * Which first-pass leaf MarkOccupiedLeafs (outside.cc) puts a point in: the same arithmetic as
+ * PointInLeaf on the same plane values, so the same answer. On a node plane both sides are
+ * looked at, and for hull 0 the sealing one wins.
+ */
+static int32_t first_leaf_of(const hull0_t &t, int32_t num, const qvec3d &p)
+{
+    if (num < 0) {
+        return -1 - num;
+    }
+    const h0_node_t &n = t.first_nodes[num];
+    const double dist = qv::dot(n.plane.normal, p) - n.plane.dist;
+    if (dist > 0) {
+        return first_leaf_of(t, n.children[0], p);
+    }
+    if (dist < 0) {
+        return first_leaf_of(t, n.children[1], p);
+    }
+    const int32_t front = first_leaf_of(t, n.children[0], p);
+    const int32_t back = first_leaf_of(t, n.children[1], p);
+    constexpr bool prefer_sealing = true; // hull 0
+    return prefer_sealing == t.first_leaves[front].seals ? front : back;
+}
+
+static void occupied_areas(const hull0_t &t, std::vector<int32_t> &outside, std::vector<int32_t> &detail)
+{
+    outside.clear();
+    detail.clear();
+    for (auto &origin : occupants()) {
+        const h0_first_leaf_t &leaf = t.first_leaves[first_leaf_of(t, t.first_head, qvec3d(origin))];
+        if (leaf.seals) {
+            continue; // MarkOccupiedLeafs skips it
+        }
+        outside.push_back(leaf.outside_area);
+        if (leaf.detail_area >= 0) {
+            detail.push_back(leaf.detail_area);
+        }
+    }
+    for (auto *v : {&outside, &detail}) {
+        std::ranges::sort(*v);
+        v->erase(std::unique(v->begin(), v->end()), v->end());
+    }
+}
+
+void hull0_store_first(tree_t &tree)
+{
+    hull0_pending.reset();
+    if (!is_enabled) {
+        return;
+    }
+    auto t = std::make_unique<hull0_t>();
+
+    std::unordered_map<const node_t *, int32_t> leaf_index;
+    std::vector<const node_t *> leaf_nodes;
+    t->first_head = record_tree(t->first_nodes, tree.headnode, [&](const node_t *node) {
+        const contentflags_t &c = node->get_leafdata()->contents;
+        const int32_t index = static_cast<int32_t>(t->first_leaves.size());
+        t->first_leaves.push_back({c.seals_map(), -1, -1});
+        leaf_index[node] = index;
+        leaf_nodes.push_back(node);
+        return index;
+    });
+
+    // label the connected areas of empty space through the portals, the way FillOutside
+    // (LeafSealsMap) and FillDetail (LeafSealsForDetailFill) flood them
+    auto label = [&](auto seals, int32_t h0_first_leaf_t::*area) {
+        int32_t next = 0;
+        for (size_t i = 0; i < leaf_nodes.size(); i++) {
+            if (t->first_leaves[i].*area >= 0 || seals(leaf_nodes[i]->get_leafdata()->contents)) {
+                continue;
+            }
+            std::vector<const node_t *> stack{leaf_nodes[i]};
+            t->first_leaves[i].*area = next;
+            while (!stack.empty()) {
+                const node_t *n = stack.back();
+                stack.pop_back();
+                int side;
+                for (const portal_t *p = n->portals; p; p = p->next[!side]) {
+                    side = (p->nodes[0] == n);
+                    if (!p->onnode) {
+                        continue; // to outside_node
+                    }
+                    const node_t *other = p->nodes[side];
+                    auto it = leaf_index.find(other);
+                    if (it == leaf_index.end() || t->first_leaves[it->second].*area >= 0 ||
+                        seals(other->get_leafdata()->contents)) {
+                        continue;
+                    }
+                    t->first_leaves[it->second].*area = next;
+                    stack.push_back(other);
+                }
+            }
+            next++;
+        }
+    };
+    label([](const contentflags_t &c) { return c.seals_map(); }, &h0_first_leaf_t::outside_area);
+    label([](const contentflags_t &c) { return c.is_any_solid() || c.is_sky(); }, &h0_first_leaf_t::detail_area);
+
+    occupied_areas(*t, t->occupied_outside, t->occupied_detail);
+    hull0_pending = std::move(t);
+}
+
+void hull0_store(tree_t &tree, mapentity_t &entity, const std::vector<std::shared_ptr<bspbrush_t>> &brushes)
+{
+    const bool bmodel = !map.is_world_entity(entity);
+    if (!is_enabled || (!bmodel && !hull0_pending)) {
+        return;
+    }
+    std::unique_ptr<hull0_t> t = bmodel ? std::make_unique<hull0_t>() : std::move(hull0_pending);
+    t->bmodel = bmodel;
+    if (bmodel) {
+        for (auto &brush : entity.mapbrushes) {
+            std::vector<bool> faces(brush.faces.size());
+            for (size_t i = 0; i < brush.faces.size(); i++) {
+                faces[i] = brush.faces[i].visible;
+            }
+            t->marks.push_back(std::move(faces));
+        }
+    }
+    t->key = hull0_key(entity);
+    t->shapes = brush_shapes(brushes);
+    t->tree_bounds = tree.bounds;
+    t->head_bounds = tree.headnode->bounds;
+
+    std::unordered_map<const bspbrush_t *, int32_t> index_of;
+    for (size_t i = 0; i < brushes.size(); i++) {
+        index_of[brushes[i].get()] = static_cast<int32_t>(i);
+    }
+    t->head = record_tree(t->nodes, tree.headnode, [&](const node_t *node) {
+        auto *leafdata = node->get_leafdata();
+        h0_leaf_t leaf{leafdata->contents, {}};
+        for (auto *b : leafdata->original_brushes) {
+            if (auto it = index_of.find(b); it != index_of.end()) {
+                leaf.originals.push_back(it->second);
+            }
+        }
+        t->leaves.push_back(std::move(leaf));
+        return static_cast<int32_t>(t->leaves.size() - 1);
+    });
+
+    t->last_used = generation;
+    auto [first, last] = hull0_trees.equal_range(t->key);
+    for (auto it = first; it != last;) {
+        it = it->second.shapes == t->shapes ? hull0_trees.erase(it) : std::next(it);
+    }
+    hull0_trees.emplace(t->key, std::move(*t));
+}
+
+bool hull0_reuse(tree_t &tree, mapentity_t &entity, const std::vector<std::shared_ptr<bspbrush_t>> &brushes)
+{
+    if (!is_enabled) {
+        return false;
+    }
+    const bool bmodel = !map.is_world_entity(entity);
+    const key_t key = hull0_key(entity);
+    auto [first, last] = hull0_trees.equal_range(key);
+    if (first == last) {
+        return false;
+    }
+    const std::vector<key_t> shapes = brush_shapes(brushes);
+    for (auto it = first; it != last; ++it) {
+        hull0_t &t = it->second;
+        if (t.shapes != shapes || t.bmodel != bmodel) {
+            continue;
+        }
+        if (!bmodel) {
+            std::vector<int32_t> outside, detail;
+            occupied_areas(t, outside, detail);
+            if (outside != t.occupied_outside || detail != t.occupied_detail) {
+                logging::print("hull 0: world rebuilt: the point entities are in other areas\n");
+                return false;
+            }
+        } else if (t.marks.size() != entity.mapbrushes.size()) {
+            continue;
+        }
+
+        // every plane must exist already
+        std::vector<size_t> planenums(t.nodes.size());
+        for (size_t i = 0; i < t.nodes.size(); i++) {
+            auto found = map.find_plane_nonfatal(t.nodes[i].plane);
+            if (!found || (*found & 1)) {
+                return false;
+            }
+            planenums[i] = *found;
+        }
+
+        tree.bounds = t.tree_bounds;
+        tree.headnode = tree.create_node();
+        tree.headnode->bounds = t.head_bounds;
+        auto make = [&](auto &self, node_t *n, int32_t num) -> void {
+            if (num < 0) {
+                const h0_leaf_t &leaf = t.leaves[-1 - num];
+                auto *leafdata = n->make_leaf();
+                leafdata->contents = leaf.contents;
+                for (int32_t i : leaf.originals) {
+                    leafdata->original_brushes.push_back(brushes[i].get());
+                }
+                return;
+            }
+            auto *nodedata = n->get_nodedata();
+            nodedata->planenum = planenums[num];
+            nodedata->detail_separator = t.nodes[num].detail_separator;
+            const qbsp_plane_t &plane = map.get_plane(planenums[num]);
+            for (int i = 0; i < 2; i++) {
+                node_t *child = nodedata->children[i] = tree.create_node();
+                child->parent = n;
+                child->bounds = n->bounds;
+            }
+            // same bounds as BuildTree_r gives the children
+            for (int i = 0; i < 3; i++) {
+                if (plane.get_normal()[i] == 1.0) {
+                    nodedata->children[0]->bounds[0][i] = plane.get_dist();
+                    nodedata->children[1]->bounds[1][i] = plane.get_dist();
+                    break;
+                }
+            }
+            self(self, nodedata->children[0], t.nodes[num].children[0]);
+            self(self, nodedata->children[1], t.nodes[num].children[1]);
+        };
+        make(make, tree.headnode, t.head);
+        t.last_used = generation;
+        if (bmodel) {
+            // the side marks its first pass left, which its faces depend on
+            for (size_t b = 0; b < entity.mapbrushes.size(); b++) {
+                auto &faces = entity.mapbrushes[b].faces;
+                for (size_t i = 0; i < faces.size() && i < t.marks[b].size(); i++) {
+                    faces[i].visible = t.marks[b][i];
+                }
+            }
+            hull0_bmodels_reused++;
+        } else {
+            logging::print("hull 0: world tree reused from a previous compile ({} nodes, {} leafs)\n",
+                t.nodes.size(), t.leaves.size());
+        }
+        return true;
+    }
+    return false;
+}
+
 bool chop_world_hulls()
 {
     static const bool force_chop = std::getenv("QBSPSERVER_CHOP_HULLS") != nullptr;
@@ -790,7 +1123,9 @@ void print_summary()
     if (!is_enabled) {
         return;
     }
-    logging::print("hullcache: {} clipping hulls reused ({} clipnodes), {} rebuilt, {} stored\n", reused,
-        reused_nodes, rebuilt, entries.size());
+    logging::print("hullcache: {} clipping hulls reused ({} clipnodes), {} rebuilt, {} stored; "
+                   "{} brush entity hull 0 trees reused\n",
+        reused, reused_nodes, rebuilt, entries.size(), hull0_bmodels_reused);
+    hull0_bmodels_reused = 0;
 }
 } // namespace hullcache

@@ -133,6 +133,16 @@ If the map file is byte for byte the one of the last successful compile, and the
 
 Steps 4 and 5 measured together: TOTAL 20.8 s → **18.7 s** (-9.8%). Against the start (74.9 s): **4.0x**; 3.9x faster than plain `qbsp`.
 
+### 6. Hull 0's tree
+
+Hull 0 (the drawing hull: faces, leaves, the `.prt` for vis) is built in two passes like the clipping hulls, and its tree is rebuilt every compile, even when only a texture changed. Its final tree (before filling) only depends on the brushes (shapes, contents, texture flags, order) and on the side marks of the first pass. Those come from the first filling, which keeps the areas of connected empty space that hold a point entity (`FillOutside`), and the same with detail counting as wall (`FillDetail`). These areas are a property of the geometry, not of the tree.
+
+So the server keeps hull 0's final tree, plus the first pass's tree with its areas labelled (flooding through its portals, the way the two fillings flood). On the next compile, if the brushes are the same, the point entities are placed in the stored first tree with exactly qbsp's arithmetic (`PointInLeaf`, the same plane values, the sealing side winning on a node plane) and if they occupy the same set of areas, the final tree is exactly the one a fresh compile would build: it is grafted, and both `BrushBSP` passes, the first portals and the first filling are skipped. Its filling, the faces (with this compile's textures), T-junctions and output are done as usual. Moving a light inside the same room keeps the tree; moving it into another room rebuilds it.
+
+Brush entities (doors, platforms, buttons...) the same, per entity, without the entities part; but their faces depend on the side marks their first pass left (`FillBrushEntity`, never redone on the final tree), so those marks are stored with the tree and restored.
+
+Result: TOTAL 18.7 s → **13.8 s** (-26%); e3m4 entity / texture edits 1.3-1.4 s → 0.66-0.78 s (10-12x faster than `qbsp`), geometry edits -12% to -30% (the 263 brush entities are reused). quakemash: entity / texture edits 17 s → **5 s** (54x), brush edits 26 s → 21 s (13x). Against the start (74.9 s): **5.4x**.
+
 ### Tried and dropped
 
 - **Hull 0 in one pass** (like step 2): bspcheck failed on e3m4. Hull 0's faces come from the final tree's portals, and a tree built with the final pass's marks lost a few faces (0.01% of the drawn area). Hull 0 keeps its two passes.
@@ -146,10 +156,10 @@ Steps 4 and 5 measured together: TOTAL 20.8 s → **18.7 s** (-9.8%). Against th
 | | time |
 |---|---|
 | first compile in the server | 155 s (no hull chopping, cell grid: already faster) |
-| no change / texture | 17 s (16x) |
-| one brush moved / a few moved, retextured, added | 26 s (10x) |
+| no change / texture | 17 s (16x); with step 6: 5 s (54x) |
+| one brush moved / a few moved, retextured, added | 26 s (10x); with step 6: 21 s (13x) |
 
-At this scale **hull 0 is what's left**: its two `BrushBSP` passes are 7 s of the 17 s (the precise pass 5 s), plus its portals, filling and faces. The clipping hulls' portals (`MakeTreePortals`, 2-2.6 s each) come next for geometry edits.
+What's left for geometry edits at this scale: hull 0 rebuilt (its two `BrushBSP` passes, 5.4 s), the clipping hulls' portals (`MakeTreePortals`, 1.8-2.2 s each), map loading (0.9 s). For entity / texture edits (5 s): map loading, hull 0's portals, T-junctions, faces, writing.
 
 ## Measuring
 
@@ -264,4 +274,4 @@ qbspreceive [-port N] mapname[.map]
 
 1. **Done: client/server.** Both programs, the protocol, log streaming and exit codes. Each request still runs a **full** `qbsp` compile in the server process (`InitQBSP` + `ProcessFile`, like `qbsp` itself).
 2. **Done: measuring.** Benchmark with scenarios, reference compiles, equivalence checks and a history (see Measuring). Profile: the collision hulls are ~90% of the time (see Change tracking). Baseline logged as `baseline: full qbsp per request`: **TOTAL 81.8 s** (small 11.5 s, e3m4 70.3 s), reference 81.9 s, speedup 1.00x, all checks OK. Over the 42 paired repetitions the server is as fast as plain `qbsp` (ratio median 1.03 on small, 0.99 on e3m4), as expected while it still compiles everything.
-3. **In progress: incremental compiles** (see Incremental compiles). Done: no throttling, whole clipping hulls, one-pass hulls, cells, no hull chopping, unchanged-map shortcut. Benchmark TOTAL 74.9 s → 18.7 s (4.0x). Next candidates: hull 0 without degrading its tree (reuse its tree when the geometry and the entities' regions are unchanged, and only redo faces), and the clipping hulls' `MakeTreePortals` (per-cell portals).
+3. **In progress: incremental compiles** (see Incremental compiles). Done: no throttling, whole clipping hulls, one-pass hulls, cells, no hull chopping, unchanged-map shortcut, hull 0 tree reuse. Benchmark TOTAL 74.9 s → 13.8 s (5.4x). Next candidates: the clipping hulls' `MakeTreePortals` (per-cell portals), hull 0 for geometry edits without degrading its tree, map loading (parse only the entities that changed).

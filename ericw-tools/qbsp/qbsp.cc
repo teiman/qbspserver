@@ -1198,6 +1198,24 @@ static void ProcessEntity(mapentity_t &entity, hull_index_t hullnum)
     // full operation for collision (or main hull)
     tree_t tree;
 
+    // qbspserver: hull 0's tree is reused when a fresh compile would build the very same one (same
+    // brushes; for the world, the entities in the same areas, see hullcache.hh). Only the world's
+    // filling and what follows (faces...) are done again.
+    const bool hull0 = hullnum.has_value() && hullnum.value() == 0 && !qbsp_options.debugbspbrushes.value() &&
+                       !qbsp_options.debugleafvolumes.value();
+    const bool world_hull0 = hull0 && map.is_world_entity(entity) && !qbsp_options.nofill.value();
+    const bool bmodel_hull0 = hull0 && !map.is_world_entity(entity);
+    if ((world_hull0 || bmodel_hull0) && hullcache::hull0_reuse(tree, entity, brushes)) {
+        if (world_hull0) {
+            MakeTreePortals(tree);
+            const bool filled = FillOutside(tree, hullnum, brushes);
+            hullcache::note_hull0_filled(filled);
+            if (filled && qbsp_options.filldetail.value())
+                FillDetail(tree, hullnum, brushes);
+        }
+        // a brush entity's side marks (from its first pass) were restored with the tree
+    } else {
+
     BrushBSP(tree, entity, brushes,
         qbsp_options.forcegoodtree.value() ? tree_split_t::PRECISE : // we asked for the slow method
             !map.is_world_entity(entity) ? tree_split_t::FAST
@@ -1221,6 +1239,10 @@ static void ProcessEntity(mapentity_t &entity, hull_index_t hullnum)
                 GatherLeafVolumes_r(tree.headnode, all_bspbrushes);
                 WriteBspBrushMap("first-brushbsp-volumes", all_bspbrushes);
             }
+        }
+
+        if (world_hull0) {
+            hullcache::hull0_store_first(tree);
         }
 
         // flood fills from the void.
@@ -1256,6 +1278,10 @@ static void ProcessEntity(mapentity_t &entity, hull_index_t hullnum)
             // make the real portals for vis tracing
             MakeTreePortals(tree);
 
+            if (world_hull0) {
+                hullcache::hull0_store(tree, entity, brushes);
+            }
+
             // fill again so PruneNodes works
             FillOutside(tree, hullnum, brushes);
 
@@ -1273,7 +1299,13 @@ static void ProcessEntity(mapentity_t &entity, hull_index_t hullnum)
         // rebuild BSP now that we've marked invisible brush sides
         tree.clear();
         BrushBSP(tree, entity, brushes, tree_split_t::PRECISE);
+
+        if (bmodel_hull0) {
+            hullcache::hull0_store(tree, entity, brushes);
+        }
     }
+
+    } // !hull0_reuse
 
     MakeTreePortals(tree);
 
