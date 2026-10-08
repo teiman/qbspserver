@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<!--math lib-->
+	<Type Name="qvec&lt;*,*&gt;">
+		<DisplayString>{($T1 *) (&amp; v),[$T2]}</DisplayString>
+		<Expand>
+			<ExpandedItem>v</ExpandedItem>
+		</Expand>
+	</Type>
+	<Type Name="qmat&lt;*,*,*&gt;">
+		<DisplayString>{$T2} row x {$T3} col matrix, column major</DisplayString>
+		<Expand>
+		  <!-- $T1 is element type  -->
+		  <!-- $T2 is # rows  -->
+		  <!-- $T3 is # cols  -->
+
+		  <CustomListItems>
+		    <!--
+		    CLion workaround, we can't read template variables like $T2 in the array size
+		    specifier.
+		    -->
+			<Variable Name="rows" InitialValue="$T2"/>
+			<Variable Name="col" InitialValue="0"/>
+			<Loop Condition="col &lt; $T3">
+			  <!-- NTOE:
+			  the ",[$T2]" is a size specifier, see:
+			  https://learn.microsoft.com/en-us/visualstudio/debugger/format-specifiers-in-cpp?view=vs-2022#BKMK_Size_specifiers_for_pointers_as_arrays_in_Visual_Studio_2012
+			  the "na" is a specifier for "no address", i.e. don't print the address of each element
+			  -->
+			  <Item Name="col {col,na}">&amp;m_values[col * $T2],[rows]na</Item>
+			  <Exec>++col</Exec>
+			</Loop>
+		  </CustomListItems>
+		</Expand>
+	</Type>
+	<Type Name="polylib::winding_base_t&lt;*&gt;">
+		<DisplayString>{count} points</DisplayString>
+		<Expand>
+			<Item Name="[size]">count</Item>
+			<IndexListItems>
+				<Size>count</Size>
+				<ValueNode Condition="$i &lt; $T1">array[$i]</ValueNode>
+				<ValueNode Condition="$i &gt;= $T1">vector[$i - $T1]</ValueNode>
+			</IndexListItems>
+		</Expand>
+	</Type>
+
+	<!--settings-->
+	<Type Name="settings::setting_value&lt;*&gt;">
+		<DisplayString>{_value} from {_source}</DisplayString>
+		<Expand>
+			<ExpandedItem>_value</ExpandedItem>
+		</Expand>
+	</Type>
+</AutoVisualizer>

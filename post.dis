@@ -1,0 +1,25 @@
+## qbspserver: incremental `qbsp` — speed report
+
+`qbspserver` keeps a map loaded in a background process and recompiles it when you run `qbspreceive` (e.g. from your editor's compile script). It remembers what it built last time and only redoes what your edit touched. The output doesn't need to be byte-identical to `qbsp`, only to **play the same**: every benchmark run checks that (entities, drawn surfaces per texture, and point contents in hulls 0/1/2 at ~46k points, including around every changed face).
+
+**Benchmark** (7 edit scenarios × 2 maps, median of 3, paired with a plain `qbsp` run each time; Intel Core 7 240H laptop):
+```
+                      e3m4 (LibreQuake)   E1M1
+plain qbsp                 ~8.7 s         ~1.6 s
+qbspserver, no change      0.04 s         0.03 s
+  1 entity / 1 texture     1.3-1.4 s      0.35 s
+  1 brush moved / added    2.5-3.1 s      0.6 s
+  many edits (2% brushes)  4.3 s          0.7 s
+```
+**Total of all scenarios: 74.9 s → 18.7 s (4.0×), 3.9× faster than plain qbsp.**
+
+Big map (quakemash, 35k brushes, plain qbsp 271 s): texture/entity edit **17 s (16×)**, brush edits **26 s (10×)**.
+
+**How**
+• Clipping hulls 1/2 (90% of a big compile) are reused whole when only textures or point entities change.
+• When geometry changes they're built in one pass instead of two, and split on a 1024-unit grid: only the cells you touched are rebuilt (1-2 of ~70).
+• Unchanged map + wads + bsp → answered instantly.
+
+**Bonus for everyone:** Windows 11 throttles "background" processes (EcoQoS: lower clocks / E-cores on hybrid CPUs). Compilers started from a script or editor can be hit: we measured **25% slower**. All ericw-tools programs in this fork now opt out of it.
+
+Still to do: hull 0 (now the slowest part on big maps) — without making the tree worse for `vis`.

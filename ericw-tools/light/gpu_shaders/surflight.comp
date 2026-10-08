@@ -1,0 +1,214 @@
+#version 460
+#extension GL_EXT_ray_query : require
+
+// Surface lights and bounce lights for vklight. One invocation per lightmap sample; loops over
+// the emitters assigned to the sample's face. Mirrors LightFace_SurfaceLight /
+// GetSurfaceLighting / SurfaceLight_ColorAtDist / Dirt_GetScaleFactor (no entity) in
+// ltface.cc; keep them in sync.
+//
+// If any ray of an emitter meets filtered (non-opaque) geometry, the whole (sample, emitter)
+// contribution is left out and reported for a CPU re-trace, so nothing is counted twice.
+
+layout(local_size_x = 64) in;
+
+const uint EMITTER_FLAG_OMNIDIRECTIONAL = 1u;
+const uint EMITTER_FLAG_RESCALE = 2u;
+const uint FACE_FLAG_TWOSIDED = 1u;
+const uint FACE_FLAG_NODIRT = 2u;
+const uint SAMPLE_SKIP = 0xffffffffu;
+const uint ENTRY_SLOT_SHIFT = 24u;
+const uint ENTRY_INDEX_MASK = (1u << ENTRY_SLOT_SHIFT) - 1u;
+const float LIGHT_ANGLE_EPSILON = 0.01;
+
+struct Emitter {
+    vec3 surfnormal; float intensity;
+    vec3 color; float atten;
+    uint point_begin; uint point_count; uint flags; uint pad;
+};
+
+struct Sample {
+    vec3 pos; float occlusion;
+    vec3 normal; uint face;
+};
+
+struct Face {
+    uint entry_begin; uint entry_count; uint flags; uint pad;
+};
+
+struct Accum {
+    vec3 color; float hits;
+    vec3 direction; float pad;
+};
+
+struct Retrace {
+    uint sample_index; uint entry;
+};
+
+layout(set = 0, binding = 0) uniform accelerationStructureEXT scene;
+layout(std430, set = 0, binding = 1) readonly buffer Emitters { Emitter emitters[]; };
+layout(std430, set = 0, binding = 2) readonly buffer Points { vec4 points[]; };
+layout(std430, set = 0, binding = 3) readonly buffer Samples { Sample samples[]; };
+layout(std430, set = 0, binding = 4) readonly buffer Faces { Face faces[]; };
+layout(std430, set = 0, binding = 5) readonly buffer Entries { uint entries[]; };
+layout(std430, set = 0, binding = 6) buffer Accums { Accum accum[]; };
+layout(std430, set = 0, binding = 7) writeonly buffer Retraces { Retrace retraces[]; };
+layout(std430, set = 0, binding = 8) buffer Counters { uint retrace_count; };
+
+layout(push_constant) uniform PushConstants {
+    uint sample_count;
+    uint sample_base;
+    uint slot_count;
+    uint retrace_capacity;
+    float standard_scale;
+    float sky_scale;
+    float hotspot_clamp;
+    float gate;
+    float sky_dist;
+    float scaledist;
+    float dirtgain;
+    float dirtscale;
+    uint dirt;
+} pc;
+
+// SurfaceLight_ColorAtDist: GetLightValue(LF_QRAD3) * surf_scale * color
+vec3 color_at_dist(float surf_scale, float intensity, vec3 color, float dist, float atten)
+{
+    float value = pc.scaledist * atten * dist;
+    float d = max(value, pc.hotspot_clamp);
+    float v = (intensity / (d * d)) * surf_scale;
+    return color * v;
+}
+
+// GetSurfaceLighting; dir: emitter point -> sample
+vec3 surface_lighting(Emitter E, vec3 dir, float dist, vec3 normal, bool use_normal)
+{
+    float dot_factor = 1.0;
+    float dp1 = dot(E.surfnormal, dir);
+    vec3 sp_vpl = dir * -1.0;
+    float dp2 = use_normal ? dot(sp_vpl, normal) : 1.0;
+    bool omni = (E.flags & EMITTER_FLAG_OMNIDIRECTIONAL) != 0u;
+
+    if (!omni) {
+        if (dp1 < -LIGHT_ANGLE_EPSILON)
+            return vec3(0.0);
+        if (dp2 < -LIGHT_ANGLE_EPSILON)
+            return vec3(0.0);
+        if ((E.flags & EMITTER_FLAG_RESCALE) != 0u) {
+            dp1 = 0.5 + dp1 * 0.5;
+            dp2 = 0.5 + dp2 * 0.5;
+        }
+        dot_factor = dp1 * dp2;
+    } else {
+        dot_factor = dp2 * 0.5;
+    }
+    dot_factor = max(0.0, dot_factor);
+    if (dot_factor == 0.0)
+        return vec3(0.0);
+    if (omni)
+        dist += pc.sky_dist;
+    return color_at_dist((omni ? pc.sky_scale : pc.standard_scale) * dot_factor, E.intensity, E.color, dist, E.atten);
+}
+
+// Dirt_GetScaleFactor(cfg, occlusion, nullptr, 0, lightsurf)
+float dirt_factor(float occlusion, uint face_flags)
+{
+    if (pc.dirt == 0u || (face_flags & FACE_FLAG_NODIRT) != 0u)
+        return 1.0;
+    if (occlusion <= 0.0)
+        return 1.0;
+    float out_dirt = min(pow(occlusion, pc.dirtgain), 1.0);
+    out_dirt = min(out_dirt * pc.dirtscale, 1.0);
+    return 1.0 - out_dirt;
+}
+
+// 0 = blocked, 1 = lit, 2 = needs CPU re-trace
+uint trace(vec3 origin, vec3 dir, float dist)
+{
+    rayQueryEXT rq;
+    rayQueryInitializeEXT(rq, scene, gl_RayFlagsTerminateOnFirstHitEXT, 0xff, origin, 0.0, dir, dist);
+    bool filtered = false;
+    while (rayQueryProceedEXT(rq)) {
+        filtered = true;
+    }
+    if (rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT)
+        return 0u;
+    return filtered ? 2u : 1u;
+}
+
+bool gated(vec3 c)
+{
+    // qv::gate: every component <= gate
+    return c.x <= pc.gate && c.y <= pc.gate && c.z <= pc.gate;
+}
+
+void main()
+{
+    uint sid = pc.sample_base + gl_GlobalInvocationID.x;
+    if (sid >= pc.sample_count)
+        return;
+
+    Sample s = samples[sid];
+    uint base = sid * pc.slot_count;
+    for (uint k = 0u; k < pc.slot_count; ++k) {
+        accum[base + k].color = vec3(0.0);
+        accum[base + k].hits = 0.0;
+        accum[base + k].direction = vec3(0.0);
+        accum[base + k].pad = 0.0;
+    }
+    if (s.face == SAMPLE_SKIP)
+        return;
+
+    Face f = faces[s.face];
+    bool twosided = (f.flags & FACE_FLAG_TWOSIDED) != 0u;
+    float dirt = dirt_factor(s.occlusion, f.flags);
+
+    for (uint e = f.entry_begin; e < f.entry_begin + f.entry_count; ++e) {
+        uint entry = entries[e];
+        Emitter E = emitters[entry & ENTRY_INDEX_MASK];
+
+        vec3 sum = vec3(0.0);
+        float hits = 0.0;
+        bool retrace = false;
+        for (uint p = E.point_begin; p < E.point_begin + E.point_count; ++p) {
+            vec3 pos = points[p].xyz;
+            vec3 dir = s.pos - pos;
+            float dist = max(0.01, length(dir));
+            bool use_normal = true;
+            if (twosided) {
+                use_normal = false;
+                dir /= dist;
+            } else if (dist == 0.0) {
+                dir = s.normal;
+                use_normal = false;
+            } else {
+                dir /= dist;
+            }
+
+            vec3 indirect = surface_lighting(E, dir, dist, s.normal, use_normal);
+            if (gated(indirect))
+                continue;
+
+            uint hit = trace(pos, dir, dist);
+            if (hit == 0u)
+                continue;
+            if (hit == 2u) {
+                retrace = true;
+                break;
+            }
+            sum += indirect * dirt;
+            hits += 1.0;
+        }
+
+        if (retrace) {
+            uint idx = atomicAdd(retrace_count, 1u);
+            if (idx < pc.retrace_capacity)
+                retraces[idx] = Retrace(sid, e);
+            continue;
+        }
+        if (hits > 0.0) {
+            uint a = base + (entry >> ENTRY_SLOT_SHIFT);
+            accum[a].color += sum;
+            accum[a].hits += hits;
+        }
+    }
+}

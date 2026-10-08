@@ -1,0 +1,128 @@
+# ---------------------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------------------
+# build.bat folder and downloaded Embree/TBB
+ericw-tools/build-windows/
+ericw-tools/deps/
+# Any other CMake build folder (VS Code CMake Tools defaults to build/ in the root)
+build/
+build-*/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CMakeUserPresets.json
+CMakeSettings.json
+
+# Compiled binaries, debug symbols and intermediates
+*.exe
+# ...except the QuakeC compiler used by mod\build.bat
+!mod/bin/fteqcc64.exe
+*.dll
+*.pdb
+*.ilk
+*.exp
+*.obj
+*.idb
+*.iobj
+*.ipdb
+*.tlog
+*.lastbuildstate
+# GPU shaders compiled from light/shaders/*.comp
+*.spv
+
+# Distribution packages (dist.bat)
+dist/
+*.zip
+*.7z
+
+# ---------------------------------------------------------------------------
+# Map compiler output (qbsp / vis / light / bsputil), anywhere in the tree
+# ---------------------------------------------------------------------------
+*.bsp
+*.lit
+*.lux
+*.prt
+*.pts
+*.lin
+*.vis
+*.texinfo
+*.texinfo.json
+*.content.json
+*.qbsplog
+*.log
+*-decompile*.map
+*.chop.map
+# ...except the precompiled BSPs that ship with ericw-tools' tests
+!ericw-tools/testmaps/compiled/*.bsp
+
+# ---------------------------------------------------------------------------
+# Output of the test scripts in the root
+# ---------------------------------------------------------------------------
+# Per-run tool output (build.bat, bench.py redirected to a file...)
+*_last.txt
+*_last_*.txt
+# tools/bench.py: the history (bench_history.txt / .jsonl, bench_details.txt) and the
+# leak-free edit picks (bench_seeds.json) are kept: they are the record of every version.
+# Its work files are not:
+testmap/bench/
+testmap/_bench_*
+testmap/_probe*
+testmap/bench_quakemash.txt
+
+# Third-party texture WADs (not redistributable; see testing.md)
+*.wad
+# ...except the test WADs that ship with ericw-tools
+!ericw-tools/testmaps/**/*.wad
+
+# Map editor backups (TrenchBroom, J.A.C.K., ...)
+autosave/
+*.bak
+*.autosave.map
+
+# ---------------------------------------------------------------------------
+# Tools, editors, OS
+# ---------------------------------------------------------------------------
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Visual Studio / VS Code / other IDEs
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+ipch/
+.vscode/*
+!.vscode/settings.json
+.idea/
+.claude/settings.local.json
+
+# Temporary files, merge leftovers
+*.tmp
+*.temp
+*.orig
+*.rej
+*.swp
+*~
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Fluxite suggestions
+.claude/
+.cursor/
+.vscode/
+*$py.class
+*.so
+.env
+*.egg-info/
+progs.dat
+progs.lno
+*.pak

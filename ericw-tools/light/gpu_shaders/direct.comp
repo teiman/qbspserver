@@ -1,0 +1,293 @@
+#version 460
+#extension GL_EXT_ray_query : require
+
+// Direct lighting for vklight. One invocation per lightmap sample; loops over the
+// lights assigned to the sample's face. Mirrors the CPU code in ltface.cc:
+// GetLightValue / GetLightValueWithAngle / GetLightContrib / Dirt_GetScaleFactor /
+// LightFace_Entity / LightFace_Sky. Keep them in sync.
+//
+// Geometry: the BLAS has a solid geometry (opaque), optionally a sky geometry (opaque) and a
+// filtered geometry (non-opaque: glass, fences, switchable shadows, channel masks...).
+// Filtered triangles are never resolved here; a (sample, entry) pair whose result depends on
+// one is appended to the retrace list and the CPU re-traces it with Embree.
+
+layout(local_size_x = 64) in;
+
+const uint LIGHT_POINT = 0u;
+const uint LIGHT_SUN = 1u;
+
+const uint LIGHT_FLAG_SPOT = 1u;
+const uint LIGHT_FLAG_BLEED = 2u;
+const uint LIGHT_FLAG_DIRT = 4u;
+const uint LIGHT_FLAG_DIRT_RADIUS = 8u;
+const uint LIGHT_FLAG_SUNTEXTURE = 16u;
+
+const uint FACE_FLAG_TWOSIDED = 1u;
+const uint FACE_FLAG_NODIRT = 2u;
+
+const uint SAMPLE_SKIP = 0xffffffffu;
+const uint ENTRY_SLOT_SHIFT = 24u;
+const uint ENTRY_LIGHT_MASK = (1u << ENTRY_SLOT_SHIFT) - 1u;
+const uint NO_GEOMETRY = 0xffffffffu;
+
+// light_formula_t
+const uint LF_LINEAR = 0u;
+const uint LF_INVERSE = 1u;
+const uint LF_INVERSE2 = 2u;
+const uint LF_INFINITE = 3u;
+const uint LF_LOCALMIN = 4u;
+const uint LF_INVERSE2A = 5u;
+const uint LF_QRAD3 = 6u;
+
+const float LF_SCALE = 128.0;
+
+struct Light {
+    vec3 pos; float light;
+    vec3 dir; float maxdist;
+    vec3 color; float gate;
+    float scaled_atten; float falloff; float anglescale; float spotfalloff;
+    float spotfalloff2; float dirtgain; float dirtscale; float dirt_off_radius;
+    float dirt_on_radius; uint suntexture; uint flags; uint type;
+    uint formula; uint pad0; uint pad1; uint pad2;
+};
+
+struct Sample {
+    vec3 pos; float occlusion;
+    vec3 normal; uint face;
+};
+
+struct Face {
+    uint entry_begin; uint entry_count; uint flags; uint pad;
+};
+
+struct Accum {
+    vec3 color; float hits;
+    vec3 direction; float pad;
+};
+
+struct Retrace {
+    uint sample_index; uint entry;
+};
+
+layout(set = 0, binding = 0) uniform accelerationStructureEXT scene;
+layout(std430, set = 0, binding = 1) readonly buffer Lights { Light lights[]; };
+layout(std430, set = 0, binding = 2) readonly buffer Samples { Sample samples[]; };
+layout(std430, set = 0, binding = 3) readonly buffer Faces { Face faces[]; };
+layout(std430, set = 0, binding = 4) readonly buffer Entries { uint entries[]; };
+layout(std430, set = 0, binding = 5) buffer Accums { Accum accum[]; };
+layout(std430, set = 0, binding = 6) writeonly buffer Retraces { Retrace retraces[]; };
+layout(std430, set = 0, binding = 7) buffer Counters { uint retrace_count; };
+layout(std430, set = 0, binding = 8) readonly buffer SkyTextures { uint sky_texture[]; };
+
+layout(push_constant) uniform PushConstants {
+    uint sample_count;
+    uint slot_count;
+    uint retrace_capacity;
+    uint sky_geometry; // BLAS geometry index of the sky, or NO_GEOMETRY
+    uint sample_base; // first sample of this dispatch
+} pc;
+
+// GetLightValue(cfg, formula, light, falloff, atten, dist, LF_SCALE)
+float light_value(Light L, float dist)
+{
+    if (L.formula == LF_INFINITE || L.formula == LF_LOCALMIN)
+        return L.light;
+
+    if (L.falloff > 0.0 && L.formula == LF_LINEAR) {
+        if (L.falloff > dist)
+            return L.light * (1.0 - (dist / L.falloff));
+        return 0.0;
+    }
+
+    float value = L.scaled_atten * dist;
+
+    if (L.formula == LF_INVERSE)
+        return L.light / (value / LF_SCALE);
+    if (L.formula == LF_INVERSE2A || L.formula == LF_INVERSE2) {
+        if (L.formula == LF_INVERSE2A)
+            value += LF_SCALE;
+        return L.light / ((value * value) / (LF_SCALE * LF_SCALE));
+    }
+    if (L.formula == LF_LINEAR) {
+        if (L.light > 0.0)
+            return (L.light - value > 0.0) ? L.light - value : 0.0;
+        return (L.light + value < 0.0) ? L.light + value : 0.0;
+    }
+    if (L.formula == LF_QRAD3) {
+        float d = max(value, LF_SCALE);
+        return L.light / (d * d);
+    }
+    return 0.0;
+}
+
+// Dirt_GetScaleFactor; LIGHT_FLAG_DIRT already folds in dirt_in_use and the light's _dirt
+float dirt_factor(Light L, float occlusion, float dist, uint face_flags)
+{
+    if ((L.flags & LIGHT_FLAG_DIRT) == 0u || (face_flags & FACE_FLAG_NODIRT) != 0u)
+        return 1.0;
+    if (occlusion <= 0.0)
+        return 1.0;
+
+    float out_dirt = min(pow(occlusion, L.dirtgain), 1.0);
+    out_dirt = min(out_dirt * L.dirtscale, 1.0);
+
+    if ((L.flags & LIGHT_FLAG_DIRT_RADIUS) != 0u) {
+        if (dist < L.dirt_off_radius) {
+            out_dirt = 0.0;
+        } else if (dist < L.dirt_on_radius) {
+            float frac;
+            if (dist >= L.dirt_on_radius)
+                frac = 1.0;
+            else if (dist <= L.dirt_off_radius)
+                frac = 0.0;
+            else
+                frac = (dist - L.dirt_off_radius) / (L.dirt_on_radius - L.dirt_off_radius);
+            out_dirt = frac * out_dirt;
+        }
+    }
+    return 1.0 - out_dirt;
+}
+
+float brightness(vec3 c)
+{
+    return (c.x + c.y + c.z) / 3.0;
+}
+
+// 0 = blocked, 1 = lit, 2 = needs CPU re-trace
+uint trace_point(vec3 origin, vec3 dir, float dist)
+{
+    rayQueryEXT rq;
+    rayQueryInitializeEXT(rq, scene, gl_RayFlagsTerminateOnFirstHitEXT, 0xff, origin, 0.0, dir, dist);
+    bool filtered = false;
+    while (rayQueryProceedEXT(rq)) {
+        // only non-opaque (filtered) triangles are reported as candidates
+        filtered = true;
+    }
+    if (rayQueryGetIntersectionTypeEXT(rq, true) != gl_RayQueryCommittedIntersectionNoneEXT)
+        return 0u; // a solid occluder blocks the light no matter what filtered geometry does
+    return filtered ? 2u : 1u;
+}
+
+uint trace_sun(vec3 origin, vec3 dir, float dist, Light L)
+{
+    rayQueryEXT rq;
+    rayQueryInitializeEXT(rq, scene, gl_RayFlagsNoneEXT, 0xff, origin, 0.0, dir, dist);
+    float filtered_t = 1e30;
+    while (rayQueryProceedEXT(rq)) {
+        filtered_t = min(filtered_t, rayQueryGetIntersectionTEXT(rq, false));
+    }
+    if (rayQueryGetIntersectionTypeEXT(rq, true) == gl_RayQueryCommittedIntersectionNoneEXT)
+        return filtered_t < 1e30 ? 2u : 0u; // nothing opaque: the CPU decides what the filters do
+
+    float t = rayQueryGetIntersectionTEXT(rq, true);
+    if (filtered_t < t)
+        return 2u;
+
+    uint geometry = rayQueryGetIntersectionGeometryIndexEXT(rq, true);
+    if (geometry != pc.sky_geometry)
+        return 0u;
+    if ((L.flags & LIGHT_FLAG_SUNTEXTURE) != 0u) {
+        uint prim = rayQueryGetIntersectionPrimitiveIndexEXT(rq, true);
+        if (sky_texture[prim] != L.suntexture)
+            return 0u;
+    }
+    return 1u;
+}
+
+void main()
+{
+    uint sid = pc.sample_base + gl_GlobalInvocationID.x;
+    if (sid >= pc.sample_count)
+        return;
+
+    Sample s = samples[sid];
+    uint base = sid * pc.slot_count;
+    for (uint k = 0u; k < pc.slot_count; ++k) {
+        accum[base + k].color = vec3(0.0);
+        accum[base + k].hits = 0.0;
+        accum[base + k].direction = vec3(0.0);
+        accum[base + k].pad = 0.0;
+    }
+    if (s.face == SAMPLE_SKIP)
+        return;
+
+    Face f = faces[s.face];
+    bool twosided = (f.flags & FACE_FLAG_TWOSIDED) != 0u;
+
+    for (uint e = f.entry_begin; e < f.entry_begin + f.entry_count; ++e) {
+        uint entry = entries[e];
+        Light L = lights[entry & ENTRY_LIGHT_MASK];
+
+        vec3 color;
+        vec3 normalcontrib;
+        vec3 dir;
+        float dist;
+
+        if (L.type == LIGHT_SUN) {
+            // LightFace_Sky
+            dir = L.dir;
+            dist = L.maxdist;
+            float angle = dot(dir, s.normal);
+            if (twosided && angle < 0.0)
+                angle = -angle;
+            angle = max(0.0, angle);
+            angle = (1.0 - L.anglescale) + L.anglescale * angle;
+            float value = angle * L.light;
+            value *= dirt_factor(L, s.occlusion, 0.0, f.flags);
+            color = L.color * (value / 255.0);
+            if (abs(brightness(color)) <= L.gate)
+                continue;
+            normalcontrib = dir * value;
+        } else {
+            // LightFace_Entity / GetLightContrib
+            vec3 to_light = L.pos - s.pos;
+            dist = length(to_light);
+            dir = to_light / dist;
+            if (dist < 0.1) {
+                dist = 0.1;
+                dir = vec3(0.0, 0.0, 1.0);
+            }
+
+            float angle = dot(dir, s.normal);
+            if (((L.flags & LIGHT_FLAG_BLEED) != 0u || twosided) && angle < 0.0)
+                angle = -angle;
+            float add = 0.0;
+            if (angle >= 0.0) {
+                angle = (1.0 - L.anglescale) + (L.anglescale * angle);
+                add = light_value(L, dist) * angle;
+
+                if ((L.flags & LIGHT_FLAG_SPOT) != 0u) {
+                    float falloff = dot(L.dir, dir);
+                    if (falloff > L.spotfalloff) {
+                        add = 0.0;
+                    } else if (falloff > L.spotfalloff2) {
+                        float spotscale = falloff - L.spotfalloff2;
+                        spotscale /= L.spotfalloff - L.spotfalloff2;
+                        add *= 1.0 - spotscale;
+                    }
+                }
+            }
+
+            color = L.color * add * (1.0 / 255.0);
+            normalcontrib = dir * add;
+            color *= dirt_factor(L, s.occlusion, dist, f.flags);
+            if (abs(brightness(color)) <= L.gate)
+                continue;
+        }
+
+        uint hit = (L.type == LIGHT_SUN) ? trace_sun(s.pos, dir, dist, L) : trace_point(s.pos, dir, dist);
+        if (hit == 0u)
+            continue;
+        if (hit == 2u) {
+            uint idx = atomicAdd(retrace_count, 1u);
+            if (idx < pc.retrace_capacity)
+                retraces[idx] = Retrace(sid, e);
+            continue;
+        }
+
+        uint a = base + (entry >> ENTRY_SLOT_SHIFT);
+        accum[a].color += color;
+        accum[a].direction += normalcontrib;
+        accum[a].hits += 1.0;
+    }
+}

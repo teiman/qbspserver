@@ -1,0 +1,194 @@
+option(LIGHT_ENABLE_VULKAN_GPU "Enable Vulkan GPU ray-query backend for light" OFF)
+option(SKIP_TBB_INSTALL "Skip TBB Library Installation" OFF)
+option(SKIP_EMBREE_INSTALL "Skip Embree Library Installation" OFF)
+
+set(LIGHT_INCLUDES
+	../include/light/entities.hh
+	../include/light/light.hh
+	../include/light/lightgrid.hh
+	../include/light/phong.hh
+	../include/light/bounce.hh
+	../include/light/surflight.hh
+	../include/light/ltface.hh
+	../include/light/trace.hh ../include/light/trace_gpu.hh
+	../include/light/write.hh
+	../include/light/spatialindex.hh
+)
+
+set(LIGHT_SOURCES
+	entities.cc
+	ltface.cc
+	trace.cc
+	light.cc
+	lightgrid.cc
+	phong.cc
+	bounce.cc
+	surflight.cc
+	write.cc
+	spatialindex.cc
+	${LIGHT_INCLUDES}
+)
+
+if (embree_FOUND)
+	MESSAGE(STATUS "Embree library found: ${EMBREE_LIBRARY}")
+	INCLUDE_DIRECTORIES(${EMBREE_INCLUDE_DIRS})
+	set(LIGHT_INCLUDES
+		../include/light/trace_embree.hh
+		${LIGHT_INCLUDES})
+	set(LIGHT_SOURCES
+		trace_embree.cc
+		../include/light/trace_embree.hh
+		${LIGHT_SOURCES})
+
+	# This needs to be before the add_executable
+	if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+		SET(CMAKE_INSTALL_RPATH "$ORIGIN")
+	endif ()
+endif(embree_FOUND)
+
+add_library(liblight STATIC ${LIGHT_SOURCES})
+
+if (LIGHT_ENABLE_VULKAN_GPU)
+    find_package(Vulkan REQUIRED)
+    find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
+
+    target_sources(liblight PRIVATE
+        trace_gpu_vulkan.cc
+    )
+    target_compile_definitions(liblight PRIVATE HAVE_GPU_LIGHT=1)
+    target_link_libraries(liblight PRIVATE Vulkan::Vulkan)
+
+    set(GPU_SHADER_SPVS)
+    foreach(GPU_SHADER_NAME direct dirt surflight)
+        set(GPU_SHADER_SRC "${CMAKE_CURRENT_SOURCE_DIR}/gpu_shaders/${GPU_SHADER_NAME}.comp")
+        set(GPU_SHADER_SPV "${CMAKE_CURRENT_BINARY_DIR}/gpu_shaders/${GPU_SHADER_NAME}.comp.spv")
+        add_custom_command(
+            OUTPUT "${GPU_SHADER_SPV}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/gpu_shaders"
+            COMMAND "${GLSLANG_VALIDATOR}" -V "${GPU_SHADER_SRC}" -o "${GPU_SHADER_SPV}"
+            DEPENDS "${GPU_SHADER_SRC}"
+            VERBATIM)
+        list(APPEND GPU_SHADER_SPVS "${GPU_SHADER_SPV}")
+    endforeach()
+    add_custom_target(light_gpu_shaders DEPENDS ${GPU_SHADER_SPVS})
+    add_dependencies(liblight light_gpu_shaders)
+endif()
+
+target_link_libraries(liblight PRIVATE common ${CMAKE_THREAD_LIBS_INIT} fmt::fmt jsoncpp_static)
+
+add_executable(light main.cc)
+# the target stays "light" (build.bat light, liblight...); the binary is vklight(.exe)
+set_target_properties(light PROPERTIES OUTPUT_NAME vklight)
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    # the POST_BUILD step below copies libembree4.so.4/libtbb.so.12/libtbbmalloc.so.2 next to
+    # vklight, so load them from there, both in the build folder and in the dist.sh package
+    set_target_properties(light PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE INSTALL_RPATH "$ORIGIN")
+endif()
+if (LIGHT_ENABLE_VULKAN_GPU)
+    add_dependencies(light light_gpu_shaders)
+    # vklight.exe loads shaders from <exe dir>/gpu_shaders; with multi-config generators
+    # (Visual Studio) that is a per-config subdirectory, not CMAKE_CURRENT_BINARY_DIR
+    add_custom_command(TARGET light POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:light>/gpu_shaders"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${GPU_SHADER_SPVS} "$<TARGET_FILE_DIR:light>/gpu_shaders"
+        VERBATIM)
+endif()
+
+target_link_libraries(light PRIVATE common liblight)
+
+if (embree_FOUND)
+	target_link_libraries (liblight PRIVATE embree)
+	add_definitions(-DHAVE_EMBREE)
+
+	# macOS/homebrew: hack around find_file applying the .. before resolving the symlink
+	# causing it not to find the LICENSE.txt
+	get_filename_component(embree_DIR_ABS "${embree_DIR}" REALPATH CACHE)
+
+	find_file(EMBREE_LICENSE LICENSE.txt
+		"${embree_DIR_ABS}/doc"
+		"${embree_DIR_ABS}/../../../doc"
+		"${embree_DIR_ABS}/../embree3/embree3" # vcpkg puts it here
+		"${embree_DIR_ABS}/../../.." # homebrew puts it here
+		NO_DEFAULT_PATH)
+	if (EMBREE_LICENSE STREQUAL EMBREE_LICENSE-NOTFOUND)
+		message(WARNING "Couldn't find embree license. embree_DIR: ${embree_DIR}, embree_DIR_ABS: ${embree_DIR_ABS}")
+	else()
+		message(STATUS "Found embree license: ${EMBREE_LICENSE}")
+	endif()
+
+	# HACK: Windows embree .dll's from https://github.com/embree/embree/releases ship with a tbb12.dll
+	# and we need to copy it from the embree/bin directory to our light.exe/testlight.exe dir in order for them to run
+	# (same on Linux: the embree tarball ships the libtbb.so.12 it was built against in embree/lib)
+	find_file(EMBREE_TBB_DLL NAMES tbb12.dll libtbb.so.12
+              PATHS "${EMBREE_ROOT_DIR}/bin" "${EMBREE_ROOT_DIR}/lib"
+              NO_DEFAULT_PATH)
+	if (NOT EMBREE_TBB_DLL STREQUAL EMBREE_TBB_DLL-NOTFOUND)
+		message(STATUS "Found embree EMBREE_TBB_DLL: ${EMBREE_TBB_DLL}")
+	endif()
+
+	add_custom_command(TARGET light POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:embree>"   "$<TARGET_FILE_DIR:light>"
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:TBB::tbb>" "$<TARGET_FILE_DIR:light>"
+					   COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:TBB::tbbmalloc>" "$<TARGET_FILE_DIR:light>"
+					   )
+
+	if (NOT EMBREE_LICENSE STREQUAL EMBREE_LICENSE-NOTFOUND)
+		add_custom_command(TARGET light POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_if_different "${EMBREE_LICENSE}"       "$<TARGET_FILE_DIR:light>/LICENSE-embree.txt")
+	endif()
+	if (NOT EMBREE_TBB_DLL STREQUAL EMBREE_TBB_DLL-NOTFOUND)
+		add_custom_command(TARGET light POST_BUILD
+				           COMMAND ${CMAKE_COMMAND} -E copy_if_different "${EMBREE_TBB_DLL}" "$<TARGET_FILE_DIR:light>")
+	endif()
+
+	if(NOT SKIP_EMBREE_INSTALL)
+		install(FILES $<TARGET_FILE:embree> DESTINATION .)
+	endif()
+
+	# install TBB
+	if(SKIP_TBB_INSTALL)
+		message(STATUS "Skipping TBB Install")
+	elseif(UNIX)
+		# HACK: manually follow symlinks to ensure the underlying .so files
+		# get installed, not symlinks. The "preferred method" below is installing the symlink,
+		# which produces unusable release archives.
+		get_target_property(TBB_SO_FILE_SYMLINK TBB::tbb IMPORTED_LOCATION_RELEASE)
+		message(STATUS "TBB .so symlink: ${TBB_SO_FILE_SYMLINK}")
+
+		# just the name part of the symlink
+		get_filename_component(TBB_SO_FILE_SYMLINK_NAME "${TBB_SO_FILE_SYMLINK}" NAME)
+		message(STATUS "TBB .so symlink name: ${TBB_SO_FILE_SYMLINK_NAME}")
+
+		get_filename_component(TBB_SO_FILE "${TBB_SO_FILE_SYMLINK}" REALPATH)
+		message(STATUS "TBB .so file: ${TBB_SO_FILE}")
+
+		install(FILES ${TBB_SO_FILE} DESTINATION . RENAME "${TBB_SO_FILE_SYMLINK_NAME}")
+
+		# tbbmalloc
+		get_target_property(TBBMALLOC_SO_FILE_SYMLINK TBB::tbbmalloc IMPORTED_LOCATION_RELEASE)
+		message(STATUS "TBBMALLOC .so symlink: ${TBBMALLOC_SO_FILE_SYMLINK}")
+
+		get_filename_component(TBBMALLOC_SO_FILE_SYMLINK_NAME "${TBBMALLOC_SO_FILE_SYMLINK}" NAME)
+		message(STATUS "TBBMALLOC .so symlink name: ${TBBMALLOC_SO_FILE_SYMLINK_NAME}")
+
+		get_filename_component(TBBMALLOC_SO_FILE "${TBBMALLOC_SO_FILE_SYMLINK}" REALPATH)
+
+		message(STATUS "TBBMALLOC .so file: ${TBBMALLOC_SO_FILE}")
+
+		install(FILES ${TBBMALLOC_SO_FILE} DESTINATION . RENAME "${TBBMALLOC_SO_FILE_SYMLINK_NAME}")
+	else()
+		# preferred method
+		install(FILES $<TARGET_FILE:TBB::tbb> DESTINATION .)
+		install(FILES $<TARGET_FILE:TBB::tbbmalloc> DESTINATION .)
+	endif()
+
+	if((NOT SKIP_EMBREE_INSTALL) AND (NOT EMBREE_LICENSE STREQUAL EMBREE_LICENSE-NOTFOUND))
+		install(FILES ${EMBREE_LICENSE} DESTINATION . RENAME LICENSE-embree.txt)
+	endif()
+endif(embree_FOUND)
+
+copy_mingw_dlls(light)
+add_loader_path_to_rpath(light)
+
+install(TARGETS light RUNTIME DESTINATION .)
+install(FILES ../gpl_v3.txt DESTINATION .)

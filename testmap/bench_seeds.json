@@ -1,0 +1,45 @@
+{
+  "e3m4": {
+    "attempts": {
+      "add": 0,
+      "entity": 0,
+      "geotex": 0,
+      "many": 0,
+      "move": 0,
+      "nochange": 0,
+      "texture": 0
+    },
+    "base_hash": "1fc19f1677d8",
+    "base_leaks": false,
+    "qbsp_args": "-bsp2",
+    "scenario_version": 1
+  },
+  "quakemash": {
+    "attempts": {
+      "geotex": 1,
+      "many": 0,
+      "move": 0,
+      "nochange": 0,
+      "texture": 0
+    },
+    "base_hash": "7d902c2a094a",
+    "base_leaks": false,
+    "qbsp_args": "-bsp2",
+    "scenario_version": 1
+  },
+  "small": {
+    "attempts": {
+      "add": 0,
+      "entity": 0,
+      "geotex": 0,
+      "many": 2,
+      "move": 0,
+      "nochange": 0,
+      "texture": 0
+    },
+    "base_hash": "5ac406b06a35",
+    "base_leaks": false,
+    "qbsp_args": "-bsp2",
+    "scenario_version": 1
+  }
+}
