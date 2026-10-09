@@ -119,6 +119,30 @@ void cell_remember_portals(cell_t &cell, node_t *node, const std::list<buildport
 void cell_portals_done();
 
 /*
+ * The stored fill of the world's clipping hulls. Their filling (portals of the whole tree, flood
+ * from the void, void leaves made solid) costs more than building the cells that changed. After
+ * a real filling, the server notes per cell which leaves were void, and the (hull-expanded) box
+ * of every brush. On the next compile, if no box of a changed brush (old or new place) touches
+ * a void leaf of the previous tree, the edit can't have changed the void: it can't have opened
+ * or closed a way to it. Then the void is applied instead of computed: unchanged cells copy
+ * their void leaves; a leaf of a rebuilt cell is connected empty space, so all void or none of
+ * it, and an inside point of it (taken while building) is looked up in the previous tree of
+ * that cell (a point in a changed box is not void). Anything unsure: a real filling.
+ * Only with -filltype auto (FillDetail skipped in these hulls) and when hull 0 was filled.
+ */
+// after BrushBSP (with cells) of a world clipping hull: fills it from the stored data and returns
+// true, or returns false (then: MakeTreePortals, FillOutside, record_void)
+bool fill_from_cells(int hullnum, node_t *headnode);
+// QBSPSERVER_CHECK_FILL=1: fill_from_cells only works out its answer (check_fill_pending), the
+// usual filling runs, then check_fill_compare logs every leaf where the two disagree
+bool check_fill_enabled();
+void check_fill_compare(int hullnum);
+// after a real FillOutside of a world clipping hull built with cells: note its void leaves
+void record_void(int hullnum, node_t *headnode);
+// in BuildTree_r, for a leaf of a cell being built, while its volume is still there
+void cell_leaf_point(const node_t *leaf);
+
+/*
  * qbsp chops the clipping hulls' brushes (removes their overlaps) so that BrushBSP has fewer
  * brush tests. With cells, BrushBSP only runs on the cells that changed, while chopping still
  * runs on the whole map every compile: the server skips it for the world's clipping hulls.

@@ -179,6 +179,12 @@ Plain qbsp on quakemash: 156 s → **127 s** (and 273 s before step 9: **2.15x**
 
 Profiled an e3m4 geometry edit (clipping hulls: 1.15 s of 2.4 s). Exact changes, byte-identical output, also in plain qbsp: `CountLeafs` counts locally and adds to the stats once per contents (the stats lock a mutex per call); the outside flood fills use a deque instead of a list (an allocation per push) and mark visited leaves with `outside_distance` instead of a hash set; the tree's portals live in a deque instead of one allocation each. About -3% on an e3m4 geometry edit; this kind of piece is now exhausted (see below).
 
+### 12. Stored fill of the clipping hulls (in progress)
+
+The filling of the world's clipping hulls (portals of the whole tree, flood from the void) cost more than building the changed cells. After a real filling the server notes, per tree, which leaves of each cell were void, which grid regions without brushes (leaves above the cells) were void, and the hull-expanded box of every brush. On the next compile, if no box of a changed brush (old or new place) reaches a void leaf of the previous tree (tested against each void leaf's actual region, not just its planes one by one), the edit can't have opened or closed a way to the void, so the void is applied instead of computed: reused cells copy their flags; a leaf of a rebuilt cell is connected empty space (all void or none), so an inside point of it, taken while building, is looked up in the previous tree of that cell (on a plane: both sides must agree; spare points otherwise; inside a changed box: not void). Anything unsure: a real filling, with the reason in the log.
+
+`QBSPSERVER_CHECK_FILL=1` works out the stored answer, runs the real filling anyway and compares leaf by leaf: 0 disagreements on every edit of small and e3m4, both hulls. Quick benchmark: all checks OK; e3m4 geometry edits about -10 to -25% (move 2.0 → 1.6 s, add 2.1 → 1.5 s). **Full benchmark still to run** (interrupted).
+
 ### Tried and dropped
 - **Caching the clipping hulls' expanded brushes** (`LoadBrush`: hull expansion, bevels, windings): `Brush_LoadEntity` went 0.09 → 0.08 s, within the noise; the expansion isn't its cost. Reverted.
 - **Progress bars**: every percent update is printed and flushed; a server with `-nopercent` is just as fast. Not a cost.

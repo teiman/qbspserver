@@ -1155,12 +1155,21 @@ static void ProcessEntity(mapentity_t &entity, hull_index_t hullnum)
             hullcache::cell_hull_begin(hullnum.value());
             BrushBSP(tree, entity, brushes, final_split);
             hullcache::cell_hull_end();
-            MakeTreePortals(tree);
-            hullcache::cell_portals_done();
-            filled = FillOutside(tree, hullnum, brushes);
-            if (filled && qbsp_options.filldetail.value())
-                FillDetail(tree, hullnum, brushes);
-            FreeTreePortals(tree);
+            if (hullcache::fill_from_cells(hullnum.value(), tree.headnode)) {
+                // the edit can't have changed the void: filled from the previous compile, no portals
+                hullcache::cell_portals_done();
+            } else {
+                MakeTreePortals(tree);
+                hullcache::cell_portals_done();
+                filled = FillOutside(tree, hullnum, brushes);
+                if (filled) {
+                    hullcache::check_fill_compare(hullnum.value());
+                    hullcache::record_void(hullnum.value(), tree.headnode);
+                }
+                if (filled && qbsp_options.filldetail.value())
+                    FillDetail(tree, hullnum, brushes);
+                FreeTreePortals(tree);
+            }
             if (filled)
                 PruneNodes(tree.headnode);
             CountLeafs(tree.headnode);
@@ -1183,7 +1192,9 @@ static void ProcessEntity(mapentity_t &entity, hull_index_t hullnum)
                     // fill again so PruneNodes works
                     MakeTreePortals(tree);
                     hullcache::cell_portals_done();
-                    FillOutside(tree, hullnum, brushes);
+                    if (FillOutside(tree, hullnum, brushes)) {
+                        hullcache::record_void(hullnum.value(), tree.headnode);
+                    }
                     if (qbsp_options.filldetail.value())
                         FillDetail(tree, hullnum, brushes);
 

@@ -23,6 +23,7 @@
 #include <array>
 #include <atomic>
 #include <map>
+#include <tuple>
 #include <mutex>
 #include <cmath>
 #include <cstdint>
@@ -32,6 +33,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace hullcache
@@ -91,6 +93,22 @@ struct cnode_t
 // brush -> which of its sides were visible (see apply_visibility)
 using marks_t = std::unordered_map<key_t, std::vector<bool>, key_hash>;
 
+// the stored fill (see fill_from_cells): per cell, which of its leaves (in preorder) were void;
+// and the leaves outside any cell (grid regions without brushes: BuildTree_r makes a node with
+// no brush a leaf before it gets down to a cell), by their bounds
+using cell_void_t = std::unordered_map<key_t, std::vector<uint8_t>, key_hash>;
+struct fill_data_t
+{
+    cell_void_t cells;
+    std::map<std::array<int64_t, 6>, uint8_t> loose;
+};
+// a brush of the hull and its box, grown by the hull size
+struct brush_box_t
+{
+    key_t key;
+    aabb3d box;
+};
+
 struct entry_t
 {
     std::vector<cnode_t> nodes;
@@ -102,6 +120,9 @@ struct entry_t
     std::shared_ptr<const marks_t> marks;
     // world only: the cells the tree was built from (kept alive while this entry is used)
     std::vector<key_t> cell_keys;
+    // world only: the stored fill (nullptr if it couldn't be noted)
+    std::shared_ptr<const fill_data_t> cell_void;
+    std::shared_ptr<const std::vector<brush_box_t>> brush_boxes;
     uint64_t last_used = 0;
 };
 
@@ -134,6 +155,18 @@ static std::unordered_map<int, std::shared_ptr<const marks_t>> last_marks;
 static std::shared_ptr<const marks_t> pending_marks;
 // from cells_finish(), for the store() that follows
 static std::vector<key_t> pending_cell_keys;
+// from record_void() / fill_from_cells(), for the store() that follows
+static std::shared_ptr<const fill_data_t> pending_cell_void;
+static std::shared_ptr<const std::vector<brush_box_t>> pending_brush_boxes;
+
+// per hull: the world's tree as last compiled (built or reused), for fill_from_cells
+struct last_fill_t
+{
+    std::shared_ptr<const fill_data_t> cell_void;
+    std::shared_ptr<const std::vector<brush_box_t>> brush_boxes;
+    std::vector<key_t> cell_keys;
+};
+static std::unordered_map<int, last_fill_t> last_fill;
 
 // marks the stored cells as used by this compile (defined with the cells, below)
 static void touch_cells(int hullnum, const std::vector<key_t> &keys);
@@ -365,6 +398,9 @@ bool replay(mapentity_t &entity, int hullnum)
         last_marks[hullnum] = e.marks;
     }
     touch_cells(hullnum, e.cell_keys);
+    if (map.is_world_entity(entity)) {
+        last_fill[hullnum] = {e.cell_void, e.brush_boxes, e.cell_keys};
+    }
     auto &model = map.bsp.dmodels.at(entity.outputmodelnumber.value());
     model.headnode[hullnum] = emit(e, e.head);
 
@@ -411,6 +447,9 @@ void store(mapentity_t &entity, int hullnum, node_t *headnode, bool cacheable)
         e.occupants = occupants();
         e.marks = std::move(pending_marks);
         e.cell_keys = std::move(pending_cell_keys);
+        e.cell_void = std::move(pending_cell_void);
+        e.brush_boxes = std::move(pending_brush_boxes);
+        last_fill[hullnum] = {e.cell_void, e.brush_boxes, e.cell_keys};
     }
     entries.insert_or_assign(pending_key, std::move(e));
 }
@@ -515,6 +554,7 @@ struct cell_t
     std::vector<cell_leaf_t> leaves;
     int32_t head = 0;
     uint64_t last_used = 0;
+    aabb3d bounds; // of the cell's root
     // filled by the first MakeTreePortals of a tree built from this cell
     bool has_portals = false;
     std::vector<cell_portal_t> portals;
@@ -535,7 +575,8 @@ struct cell_build_t
     std::mutex mutex;
     std::vector<std::pair<node_t *, key_t>> built; // cells built in this BrushBSP, to store
     std::vector<key_t> used; // every cell of this tree, grafted or built
-    std::vector<std::pair<node_t *, cell_t *>> grafted_nodes; // for the cell portals
+    std::vector<std::tuple<node_t *, cell_t *, key_t>> grafted_nodes; // for the cell portals and the fill
+    std::unordered_map<const node_t *, std::vector<qvec3d>> leaf_points; // inside points of the built cells' leaves
     std::atomic<size_t> grafted = 0, total = 0;
     cell_map_t *stored = nullptr; // this hull's stored cells (looked up in parallel: never inserted into while building)
 };
@@ -569,9 +610,22 @@ static void prune_cells(uint64_t oldest)
     }
 }
 
+// the cells of the hull tree being built, from cells_finish until the next cell_hull_begin
+struct tree_cell_t
+{
+    node_t *root;
+    cell_t *cell;
+    key_t key;
+    bool built;
+};
+static std::vector<tree_cell_t> tree_cells;
+static std::unordered_map<const node_t *, std::vector<qvec3d>> leaf_points;
+
 void cell_hull_begin(int hullnum)
 {
     build.reset();
+    tree_cells.clear();
+    leaf_points.clear();
     if (is_enabled && grid_mode != grid_mode_t::off_for_limits) {
         build = std::make_unique<cell_build_t>();
         build->hullnum = hullnum;
@@ -756,7 +810,7 @@ bool cell_from_cache(tree_t &tree, node_t *node, const std::vector<std::shared_p
         std::lock_guard lock(build->mutex);
         it->second.last_used = generation;
         build->used.push_back(key);
-        build->grafted_nodes.emplace_back(node, &it->second);
+        build->grafted_nodes.emplace_back(node, &it->second, key);
         build->grafted++;
         return true;
     }
@@ -804,12 +858,16 @@ void cells_finish()
         cell_t cell;
         cell.head = record_cell(cell, node);
         cell.last_used = generation;
+        cell.bounds = node->bounds;
         auto [it, inserted] = map_cells.insert_or_assign(key, std::move(cell));
         portal_cells[node] = &it->second;
+        tree_cells.push_back({node, &it->second, key, true});
     }
-    for (auto &[node, cell] : build->grafted_nodes) {
+    for (auto &[node, cell, key] : build->grafted_nodes) {
         portal_cells[node] = cell;
+        tree_cells.push_back({node, cell, key, false});
     }
+    leaf_points = std::move(build->leaf_points);
     logging::print("hull {}: world tree in {} cells of {} units, {} from a previous compile\n", build->hullnum,
         build->total.load(), cell_size, build->grafted.load());
     pending_cell_keys = std::move(build->used);
@@ -1257,6 +1315,409 @@ void cell_remember_portals(cell_t &cell, node_t *node, const std::list<buildport
     cell.portals = std::move(internal);
     cell.has_portals = true;
     portal_cells_built++;
+}
+
+// ---- the stored fill of the clipping hulls -------------------------------------------------
+
+void cell_leaf_point(const node_t *leaf)
+{
+    if (!build || !leaf->volume) {
+        return;
+    }
+    qvec3d sum{};
+    std::vector<qvec3d> corners;
+    for (auto &side : leaf->volume->sides) {
+        for (auto &p : side.w) {
+            sum += p;
+            corners.push_back(p);
+        }
+    }
+    if (corners.empty()) {
+        return;
+    }
+    // the average of a convex volume's corners is inside it; so are points between it and the
+    // corners (spares, for when the centre lies on a plane of the previous tree)
+    const qvec3d centre = sum / static_cast<double>(corners.size());
+    std::vector<qvec3d> points{centre};
+    for (size_t i = 0; i < corners.size() && points.size() < 6; i += std::max<size_t>(1, corners.size() / 5)) {
+        points.push_back(centre * 0.7 + corners[i] * 0.3);
+    }
+    std::lock_guard lock(build->mutex);
+    build->leaf_points[leaf] = std::move(points);
+}
+
+static void cell_leaves(node_t *node, std::vector<node_t *> &out)
+{
+    if (node->is_leaf()) {
+        out.push_back(node);
+        return;
+    }
+    cell_leaves(node->get_nodedata()->children[0], out);
+    cell_leaves(node->get_nodedata()->children[1], out);
+}
+
+static std::array<int64_t, 6> bounds_key(const aabb3d &b)
+{
+    return {quantize(b.mins()[0], DIST_EPSILON * 0.1), quantize(b.mins()[1], DIST_EPSILON * 0.1),
+        quantize(b.mins()[2], DIST_EPSILON * 0.1), quantize(b.maxs()[0], DIST_EPSILON * 0.1),
+        quantize(b.maxs()[1], DIST_EPSILON * 0.1), quantize(b.maxs()[2], DIST_EPSILON * 0.1)};
+}
+
+// the tree's leaves above the cells (not inside any cell)
+static void loose_leaves(node_t *node, const std::unordered_set<const node_t *> &cell_roots, std::vector<node_t *> &out)
+{
+    if (cell_roots.count(node)) {
+        return;
+    }
+    if (node->is_leaf()) {
+        out.push_back(node);
+        return;
+    }
+    loose_leaves(node->get_nodedata()->children[0], cell_roots, out);
+    loose_leaves(node->get_nodedata()->children[1], cell_roots, out);
+}
+
+static std::vector<node_t *> tree_loose_leaves(node_t *headnode)
+{
+    std::unordered_set<const node_t *> roots;
+    for (auto &tc : tree_cells) {
+        roots.insert(tc.root);
+    }
+    std::vector<node_t *> out;
+    loose_leaves(headnode, roots, out);
+    return out;
+}
+
+static std::shared_ptr<const std::vector<brush_box_t>> current_brush_boxes(int hullnum)
+{
+    auto hulls = qbsp_options.target_game->get_hull_sizes();
+    const aabb3d &hull = *(hulls.begin() + hullnum);
+    auto boxes = std::make_shared<std::vector<brush_box_t>>();
+    for_each_world_brush([&](mapbrush_t &brush) {
+        // the expanded brush (with bevels) is inside the brush's box grown by the hull's box
+        aabb3d box{brush.bounds.mins() + hull.mins() - qvec3d(1, 1, 1), brush.bounds.maxs() + hull.maxs() + qvec3d(1, 1, 1)};
+        boxes->push_back({brush_key(brush), box});
+    });
+    return boxes;
+}
+
+void record_void(int hullnum, node_t *headnode)
+{
+    pending_cell_void.reset();
+    pending_brush_boxes.reset();
+    if (!is_enabled || tree_cells.empty()) {
+        return;
+    }
+    auto data = std::make_shared<fill_data_t>();
+    cell_void_t *cell_void = &data->cells;
+    for (auto &tc : tree_cells) {
+        std::vector<node_t *> leaves;
+        cell_leaves(tc.root, leaves);
+        if (leaves.size() != tc.cell->leaves.size()) {
+            return; // not the subtree the cell describes: note nothing
+        }
+        std::vector<uint8_t> flags(leaves.size(), 0);
+        for (size_t i = 0; i < leaves.size(); i++) {
+            // OutLeafsToSolid: reached from the void, and not sealing before the filling
+            flags[i] = leaves[i]->get_leafdata()->outside_distance != -1 && !tc.cell->leaves[i].contents.seals_map();
+        }
+        (*cell_void)[tc.key] = std::move(flags);
+    }
+    for (node_t *leaf : tree_loose_leaves(headnode)) {
+        const auto *leafdata = leaf->get_leafdata();
+        data->loose[bounds_key(leaf->bounds)] = leafdata->outside_distance != -1 &&
+            leafdata->contents.equals(qbsp_options.target_game, contentflags_t::make(EWT_VISCONTENTS_SOLID));
+    }
+    pending_cell_void = std::move(data);
+    pending_brush_boxes = current_brush_boxes(hullnum);
+}
+
+constexpr double fill_epsilon = 0.01;
+
+// does `box` reach a void leaf of the cell? (conservative: a leaf counts if the box isn't
+// clearly on one side of every plane on its path)
+/*
+ * Does the box overlap the convex region { n.x <= d for every plane } (the leaf's path, plus the
+ * box's own six sides)? The region isn't empty iff one of its faces has some area: each plane's
+ * winding, clipped by all the others. Errs on "yes" (touching counts).
+ */
+static bool region_not_empty(const std::vector<qplane3d> &keep_back)
+{
+    for (size_t i = 0; i < keep_back.size(); i++) {
+        std::optional<winding_t> w = BaseWindingForPlane<winding_t>(keep_back[i]);
+        for (size_t j = 0; j < keep_back.size() && w; j++) {
+            if (j != i) {
+                w = w->clip_back(keep_back[j], fill_epsilon, false);
+            }
+        }
+        if (w) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// does `box` reach a void leaf of the cell? Going down, a side is skipped only if the box is
+// clearly on the other side of the plane; at a void leaf, the box is tested against the leaf's
+// actual region (the box can cross every plane of the path and still miss the leaf)
+static bool box_touches_void(const cell_t &cell, const std::vector<uint8_t> &flags, int32_t num, const aabb3d &box,
+    std::vector<qplane3d> &path)
+{
+    if (num < 0) {
+        if (!flags[-1 - num]) {
+            return false;
+        }
+        std::vector<qplane3d> region = path;
+        for (int i = 0; i < 3; i++) {
+            qvec3d n{};
+            n[i] = 1;
+            region.push_back({n, box.maxs()[i]});
+            region.push_back({-n, -box.mins()[i]});
+        }
+        return region_not_empty(region);
+    }
+    const cell_node_t &n = cell.nodes[num];
+    double dmin = -n.plane.dist, dmax = -n.plane.dist;
+    for (int i = 0; i < 3; i++) {
+        const double a = n.plane.normal[i] * box.mins()[i], b = n.plane.normal[i] * box.maxs()[i];
+        dmin += std::min(a, b);
+        dmax += std::max(a, b);
+    }
+    if (dmax > -fill_epsilon) {
+        // front: n.x >= d, kept as -n.x <= -d
+        path.push_back({-n.plane.normal, -n.plane.dist});
+        const bool touches = box_touches_void(cell, flags, n.children[0], box, path);
+        path.pop_back();
+        if (touches) {
+            return true;
+        }
+    }
+    if (dmin < fill_epsilon) {
+        path.push_back(n.plane);
+        const bool touches = box_touches_void(cell, flags, n.children[1], box, path);
+        path.pop_back();
+        if (touches) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// whether the leaves of the cell around point p are void: nothing if they disagree (a point on a
+// plane is looked up on both sides)
+static std::optional<bool> cell_void_at(
+    const cell_t &cell, const std::vector<uint8_t> &flags, int32_t num, const qvec3d &p)
+{
+    while (num >= 0) {
+        const cell_node_t &n = cell.nodes[num];
+        const double d = qv::dot(n.plane.normal, p) - n.plane.dist;
+        if (std::fabs(d) < fill_epsilon) {
+            auto front = cell_void_at(cell, flags, n.children[0], p);
+            auto back = cell_void_at(cell, flags, n.children[1], p);
+            if (front && back && *front == *back) {
+                return front;
+            }
+            return std::nullopt;
+        }
+        num = n.children[d > 0 ? 0 : 1];
+    }
+    return flags[-1 - num] != 0;
+}
+
+static const bool check_fill = std::getenv("QBSPSERVER_CHECK_FILL") != nullptr;
+// the leaves fill_from_cells would have made solid, and which of them are in rebuilt cells
+static std::vector<std::pair<node_t *, bool>> check_fill_answer;
+static bool check_fill_has_answer = false;
+
+bool check_fill_enabled()
+{
+    return check_fill;
+}
+
+bool fill_from_cells(int hullnum, node_t *headnode)
+{
+    auto bail = [hullnum](const char *why) {
+        if (is_enabled && !tree_cells.empty()) {
+            logging::print("hull {}: filled the usual way: {}\n", hullnum, why);
+        }
+        return false;
+    };
+    check_fill_has_answer = false;
+    check_fill_answer.clear();
+    pending_cell_void.reset();
+    pending_brush_boxes.reset();
+    if (!is_enabled || tree_cells.empty() || qbsp_options.filltype.value() != settings::filltype_t::AUTO ||
+        !hull0_filled) {
+        return bail("not enabled, no cells, -filltype not auto, or hull 0 not filled");
+    }
+    auto lf = last_fill.find(hullnum);
+    if (lf == last_fill.end() || !lf->second.cell_void || !lf->second.brush_boxes) {
+        return bail("no stored fill for this hull");
+    }
+    const cell_void_t &prev_void = lf->second.cell_void->cells;
+    const auto &prev_loose = lf->second.cell_void->loose;
+    auto stored = cells.find(hullnum);
+    if (stored == cells.end()) {
+        return bail("no stored cells for this hull");
+    }
+
+    // 1. the brushes that changed: their boxes, at the old and the new place
+    auto boxes = current_brush_boxes(hullnum);
+    std::unordered_map<key_t, int, key_hash> count;
+    for (auto &b : *boxes) {
+        count[b.key]++;
+    }
+    for (auto &b : *lf->second.brush_boxes) {
+        count[b.key]--;
+    }
+    std::vector<aabb3d> changed;
+    for (auto *list : {boxes.get(), lf->second.brush_boxes.get()}) {
+        for (auto &b : *list) {
+            if (count[b.key] != 0) {
+                changed.push_back(b.box);
+            }
+        }
+    }
+    if (changed.size() > 512) {
+        return bail("a big edit (over 512 changed brushes)");
+    }
+
+    // 2. the previous tree's cells; no changed box may touch their void
+    std::map<std::array<int64_t, 6>, std::pair<const cell_t *, const std::vector<uint8_t> *>> prev_by_bounds;
+    for (auto &k : lf->second.cell_keys) {
+        auto c = stored->second.find(k);
+        auto f = prev_void.find(k);
+        if (c == stored->second.end() || f == prev_void.end() || f->second.size() != c->second.leaves.size()) {
+            return bail("a cell of the previous tree is gone");
+        }
+        prev_by_bounds[bounds_key(c->second.bounds)] = {&c->second, &f->second};
+        for (auto &box : changed) {
+            std::vector<qplane3d> path;
+            if (!c->second.bounds.disjoint(box) && box_touches_void(c->second, f->second, c->second.head, box, path)) {
+                logging::print("hull {}: filled the usual way: a changed brush touches the void\n", hullnum);
+                return false;
+            }
+        }
+    }
+
+    // 3. the void leaves of this tree
+    auto data = std::make_shared<fill_data_t>();
+    cell_void_t *cell_void = &data->cells;
+    std::vector<node_t *> to_fill;
+
+    // the leaves above the cells: the same grid regions as before, the same void (they have no
+    // brush, so no changed brush is in them)
+    for (node_t *leaf : tree_loose_leaves(headnode)) {
+        auto it = prev_loose.find(bounds_key(leaf->bounds));
+        if (it == prev_loose.end()) {
+            return bail("a grid region without brushes is new");
+        }
+        data->loose[it->first] = it->second;
+        if (it->second && !leaf->get_leafdata()->contents.seals_map()) {
+            to_fill.push_back(leaf);
+        }
+        if (check_fill) {
+            check_fill_answer.emplace_back(leaf, it->second != 0);
+        }
+    }
+    for (auto &tc : tree_cells) {
+        std::vector<node_t *> leaves;
+        cell_leaves(tc.root, leaves);
+        std::vector<uint8_t> flags(leaves.size(), 0);
+        if (auto f = prev_void.find(tc.key); f != prev_void.end() && !tc.built) {
+            // the same cell as in the previous tree, and the void didn't change
+            if (f->second.size() != leaves.size()) {
+                return bail("a reused cell has other leaves");
+            }
+            flags = f->second;
+        } else {
+            auto prev = prev_by_bounds.find(bounds_key(tc.root->bounds));
+            if (prev == prev_by_bounds.end()) {
+                return bail("a rebuilt cell has no previous cell at its place");
+            }
+            for (size_t i = 0; i < leaves.size(); i++) {
+                if (leaves[i]->get_leafdata()->contents.seals_map()) {
+                    continue;
+                }
+                auto points = leaf_points.find(leaves[i]);
+                if (points == leaf_points.end() || points->second.empty()) {
+                    return bail("a leaf has no inside point");
+                }
+                // any inside point tells (the leaf is all void or none of it): the first that
+                // isn't ambiguous
+                std::optional<bool> is_void;
+                for (auto &p : points->second) {
+                    bool in_changed = false;
+                    for (auto &box : changed) {
+                        if (box.containsPoint(p)) {
+                            in_changed = true;
+                            break;
+                        }
+                    }
+                    if (in_changed) {
+                        is_void = false; // changed space doesn't touch the void: not void
+                        break;
+                    }
+                    is_void = cell_void_at(*prev->second.first, *prev->second.second, prev->second.first->head, p);
+                    if (is_void) {
+                        break;
+                    }
+                }
+                if (!is_void) {
+                    return bail("no inside point of a leaf gives a clear answer");
+                }
+                flags[i] = *is_void;
+            }
+        }
+        for (size_t i = 0; i < leaves.size(); i++) {
+            if (flags[i]) {
+                to_fill.push_back(leaves[i]);
+            }
+            if (check_fill) {
+                check_fill_answer.emplace_back(leaves[i], flags[i] != 0);
+            }
+        }
+        (*cell_void)[tc.key] = std::move(flags);
+    }
+    if (check_fill) {
+        check_fill_has_answer = true;
+        logging::print("hull {}: check fill: stored fill would make {} leaves solid\n", hullnum, to_fill.size());
+        return false; // the usual filling runs, then check_fill_compare
+    }
+
+    // 4. what OutLeafsToSolid does
+    for (node_t *leaf : to_fill) {
+        leaf->get_leafdata()->contents = contentflags_t::make(EWT_VISCONTENTS_SOLID);
+    }
+    pending_cell_void = std::move(data);
+    pending_brush_boxes = std::move(boxes);
+    logging::print("hull {}: filled from the previous compile ({} changed brush boxes, {} void leaves)\n", hullnum,
+        changed.size(), to_fill.size());
+    return true;
+}
+
+void check_fill_compare(int hullnum)
+{
+    if (!check_fill_has_answer) {
+        return;
+    }
+    size_t agree = 0, wrong_void = 0, wrong_kept = 0;
+    for (auto &[leaf, would_fill] : check_fill_answer) {
+        auto *leafdata = leaf->get_leafdata();
+        // what OutLeafsToSolid did
+        const bool filled = leafdata->outside_distance != -1 &&
+                            leafdata->contents.equals(qbsp_options.target_game, contentflags_t::make(EWT_VISCONTENTS_SOLID));
+        if (filled == would_fill) {
+            agree++;
+        } else if (would_fill) {
+            wrong_void++;
+        } else {
+            wrong_kept++;
+        }
+    }
+    logging::print("hull {}: check fill: {} leaves agree, {} wrongly void, {} wrongly kept\n", hullnum, agree,
+        wrong_void, wrong_kept);
+    check_fill_has_answer = false;
 }
 
 void cell_portals_done()

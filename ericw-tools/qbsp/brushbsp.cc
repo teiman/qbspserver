@@ -1325,6 +1325,10 @@ static void BuildTree_r(tree_t &tree, int level, node_t *node, bspbrush_t::conta
             // this is a leaf node
             clock();
 
+            if (in_cell && hullcache::cells_active()) {
+                hullcache::cell_leaf_point(node); // (while node->volume is still there)
+            }
+
             node->make_leaf();
 
             stats.c_leafs++;
