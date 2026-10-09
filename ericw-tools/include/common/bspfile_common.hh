@@ -438,6 +438,8 @@ private:
 
 public:
     void count_contents_in_stats(contentflags_t contents);
+    // `count` of the same contents at once (one lock instead of one per leaf)
+    void count_contents_in_stats(contentflags_t contents, size_t count);
     void print_content_stats(const char *what) const;
 };
 

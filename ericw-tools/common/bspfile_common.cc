@@ -748,6 +748,16 @@ std::vector<contentflags_t> LoadExtendedContentFlags(const fs::path &sourcefilen
 
 // content_stats_t
 
+void content_stats_t::count_contents_in_stats(contentflags_t contents, size_t count)
+{
+    {
+        std::unique_lock lock(stat_mutex);
+        native_types[contents.flags] += count;
+    }
+
+    total_brushes += count;
+}
+
 void content_stats_t::count_contents_in_stats(contentflags_t contents)
 {
     {

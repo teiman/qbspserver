@@ -364,8 +364,6 @@ MakePortalsFromBuildportals
 */
 void MakePortalsFromBuildportals(tree_t &tree, std::list<buildportal_t> &buildportals)
 {
-    tree.portals.reserve(buildportals.size());
-
     for (auto &buildportal : buildportals) {
         portal_t *new_portal = tree.create_portal();
         new_portal->plane = buildportal.plane;

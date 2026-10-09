@@ -871,11 +871,12 @@ static const bool profile_bsp = std::getenv("QBSP_PROFILE_BSP") != nullptr;
 struct bsp_profile_t
 {
     std::atomic<int64_t> choose_mid{0}, choose_precise{0}, side_test{0}, split_brushes{0}, split_volume{0},
-        leaf{0};
+        leaf{0}, cells_prepare{0}, cells_lookup{0}, cells_finish{0};
     std::atomic<int64_t> nodes{0}, mid_candidates{0}, mid_distinct{0}, mid_volume_checks{0};
     void reset()
     {
-        for (auto *a : {&choose_mid, &choose_precise, &side_test, &split_brushes, &split_volume, &leaf, &nodes,
+        for (auto *a : {&choose_mid, &choose_precise, &side_test, &split_brushes, &split_volume, &leaf,
+                 &cells_prepare, &cells_lookup, &cells_finish, &nodes,
                  &mid_candidates, &mid_distinct, &mid_volume_checks}) {
             *a = 0;
         }
@@ -1293,7 +1294,12 @@ static void BuildTree_r(tree_t &tree, int level, node_t *node, bspbrush_t::conta
         grid_plane = hullcache::grid_plane(node->bounds);
         if (!grid_plane) {
             // this node is one cell
-            if (hullcache::cell_from_cache(tree, node, brushes)) {
+            bool from_cache;
+            {
+                BSP_PROFILE(cells_lookup);
+                from_cache = hullcache::cell_from_cache(tree, node, brushes);
+            }
+            if (from_cache) {
                 clock();
                 return;
             }
@@ -1489,24 +1495,32 @@ void BrushBSP(tree_t &tree, mapentity_t &entity, const bspbrush_t::container &br
 
     bspstats_t stats{};
 
-    hullcache::cells_prepare(node->bounds, brushlist);
     if (profile_bsp) {
         bsp_profile.reset();
+    }
+    {
+        BSP_PROFILE(cells_prepare);
+        hullcache::cells_prepare(node->bounds, brushlist);
     }
     {
         logging::percent_clock clock;
         BuildTree_r(tree, 0, tree.headnode, brushlist, split_type, stats, clock);
     }
-    hullcache::cells_finish();
+    {
+        BSP_PROFILE(cells_finish);
+        hullcache::cells_finish();
+    }
     if (profile_bsp) {
         auto ms = [](const std::atomic<int64_t> &us) { return us.load() / 1000.0; };
         logging::print("BSPPROFILE {} brushes={} nodes={} | choose_mid {:.0f} ms, choose_precise(+mid) {:.0f} ms, "
                        "side_test {:.0f} ms, split_brushes {:.0f} ms, split_volume {:.0f} ms, leaf {:.0f} ms | "
+                       "cells: prepare {:.0f} ms, lookup+graft {:.0f} ms, store {:.0f} ms | "
                        "mid candidates {} distinct planes {} volume checks {}\n",
             split_type == tree_split_t::PRECISE ? "precise" : split_type == tree_split_t::FAST ? "fast" : "auto",
             brushlist.size(), bsp_profile.nodes.load(), ms(bsp_profile.choose_mid), ms(bsp_profile.choose_precise),
             ms(bsp_profile.side_test), ms(bsp_profile.split_brushes), ms(bsp_profile.split_volume),
-            ms(bsp_profile.leaf), bsp_profile.mid_candidates.load(), bsp_profile.mid_distinct.load(),
+            ms(bsp_profile.leaf), ms(bsp_profile.cells_prepare), ms(bsp_profile.cells_lookup),
+            ms(bsp_profile.cells_finish), bsp_profile.mid_candidates.load(), bsp_profile.mid_distinct.load(),
             bsp_profile.mid_volume_checks.load());
     }
 

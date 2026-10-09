@@ -32,7 +32,7 @@
 
 portal_t *tree_t::create_portal()
 {
-    return portals.emplace_back(std::make_unique<portal_t>()).get();
+    return &portals.emplace_back();
 }
 
 node_t *tree_t::create_node()
@@ -68,6 +68,7 @@ static void ClearNodePortals_r(node_t *node)
     node->portals = nullptr;
 }
 
+#include <tbb/parallel_for.h>
 #include <tbb/parallel_for_each.h>
 
 void FreeTreePortals(tree_t &tree)
@@ -77,7 +78,8 @@ void FreeTreePortals(tree_t &tree)
         tree.outside_node.portals = nullptr;
     }
 
-    tbb::parallel_for_each(tree.portals, [](std::unique_ptr<portal_t> &portal) { portal.reset(); });
+    // free the windings in parallel, like the portals were before
+    tbb::parallel_for(size_t(0), tree.portals.size(), [&](size_t i) { tree.portals[i].winding = {}; });
 
     tree.portals.clear();
     tree.portaltype = portaltype_t::NONE;

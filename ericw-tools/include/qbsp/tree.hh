@@ -27,6 +27,7 @@
 #include <common/qvec.hh>
 
 #include <memory>
+#include <deque>
 #include <vector>
 
 #include <tbb/concurrent_vector.h>
@@ -43,7 +44,8 @@ struct tree_t
     aabb3d bounds;
 
     // here for ownership/memory management - not intended to be iterated directly
-    std::vector<std::unique_ptr<portal_t>> portals;
+    // (a deque: portals keep their address, without an allocation each)
+    std::deque<portal_t> portals;
 
     // which kind of portals (cluster portals or leaf portals) are currently built?
     portaltype_t portaltype = portaltype_t::NONE;

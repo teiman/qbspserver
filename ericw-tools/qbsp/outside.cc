@@ -32,6 +32,7 @@
 #include <climits>
 #include <vector>
 #include <set>
+#include <deque>
 #include <list>
 #include <unordered_set>
 #include <utility>
@@ -146,9 +147,8 @@ preconditions:
 */
 static void FloodFillLeafsFromVoid(tree_t &tree)
 {
-    // breadth-first search
-    std::list<std::pair<node_t *, int>> queue;
-    std::unordered_set<node_t *> visited_nodes;
+    // breadth-first search (a deque: a list allocated every push)
+    std::deque<std::pair<node_t *, int>> queue;
 
     // push a node onto the queue which is in the void, but has a portal to outside_node
     // NOTE: remember, the headnode has no relationship to the outside of the map.
@@ -169,15 +169,16 @@ static void FloodFillLeafsFromVoid(tree_t &tree)
 
         auto [node, outside_distance] = front;
 
-        if (visited_nodes.find(node) != visited_nodes.end()) {
+        // FillOutside sets every leaf's outside_distance to -1 first (ClearOccupied_r), and a
+        // visited leaf gets one >= 0: that tells visited leaves apart (it was a hash set)
+        auto *leafdata = node->get_leafdata();
+        Q_assert(leafdata);
+        if (leafdata->outside_distance != -1) {
             // have already visited this node
             continue;
         }
 
         // visit node
-        visited_nodes.insert(node);
-        auto *leafdata = node->get_leafdata();
-        Q_assert(leafdata);
         leafdata->outside_distance = outside_distance;
 
         // push neighbouring nodes onto the back of the queue
@@ -563,7 +564,7 @@ sets node->occupied to 1 or more to indicate the number of steps to a directly o
 static void BFSFloodFillFromOccupiedLeafs(
     const std::vector<node_t *> &occupied_leafs, const portal_passable_t &predicate)
 {
-    std::list<std::pair<node_t *, int>> queue;
+    std::deque<std::pair<node_t *, int>> queue;
     for (node_t *leaf : occupied_leafs) {
         queue.push_back(std::make_pair(leaf, 1));
     }

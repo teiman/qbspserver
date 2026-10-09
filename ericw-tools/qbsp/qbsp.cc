@@ -907,16 +907,17 @@ static bool IsTrigger(const mapentity_t &entity)
     return trigger_pos == (tex.size() - strlen("trigger"));
 }
 
-static void CountLeafs_r(node_t *node, content_stats_t &stats)
+// counted locally and added to the stats once per contents: the stats lock a mutex per call
+static void CountLeafs_r(node_t *node, std::unordered_map<contents_t, size_t> &counts)
 {
     if (auto *leafdata = node->get_leafdata()) {
-        stats.count_contents_in_stats(leafdata->contents);
+        counts[leafdata->contents.flags]++;
         return;
     }
 
     auto *nodedata = node->get_nodedata();
-    CountLeafs_r(nodedata->children[0], stats);
-    CountLeafs_r(nodedata->children[1], stats);
+    CountLeafs_r(nodedata->children[0], counts);
+    CountLeafs_r(nodedata->children[1], counts);
 }
 
 
@@ -938,7 +939,11 @@ void CountLeafs(node_t *headnode)
     logging::funcheader();
 
     auto stats = content_stats_t();
-    CountLeafs_r(headnode, stats);
+    std::unordered_map<contents_t, size_t> counts;
+    CountLeafs_r(headnode, counts);
+    for (auto &[flags, count] : counts) {
+        stats.count_contents_in_stats(contentflags_t{.flags = flags}, count);
+    }
     stats.print_content_stats("leafs");
 
     // count the heights of the tree at each leaf
