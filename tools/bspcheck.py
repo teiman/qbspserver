@@ -111,6 +111,8 @@ class Bsp:
                 num = front if nx * x + ny * y + nz * z - d >= 0 else back
             return self.leaf_contents[-1 - num]
         clipnodes = self.clipnodes
+        if not clipnodes:
+            return -1  # a map without clipping hulls (e.g. nothing solid): all empty
         while num >= 0:
             plane, front, back = clipnodes[num]
             nx, ny, nz, d = planes[plane]
