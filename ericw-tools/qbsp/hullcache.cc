@@ -500,12 +500,24 @@ struct cell_leaf_t
     std::vector<key_t> original_brushes; // brush keys, mapped back to this compile's brushes
 };
 
+// a portal between two leaves of the same cell; nodes by their index in cell_preorder()
+struct cell_portal_t
+{
+    qbsp_plane_t plane;
+    int32_t onnode;
+    int32_t nodes[2];
+    winding_t winding;
+};
+
 struct cell_t
 {
     std::vector<cell_node_t> nodes;
     std::vector<cell_leaf_t> leaves;
     int32_t head = 0;
     uint64_t last_used = 0;
+    // filled by the first MakeTreePortals of a tree built from this cell
+    bool has_portals = false;
+    std::vector<cell_portal_t> portals;
 };
 
 using cell_map_t = std::unordered_map<key_t, cell_t, key_hash>;
@@ -523,10 +535,16 @@ struct cell_build_t
     std::mutex mutex;
     std::vector<std::pair<node_t *, key_t>> built; // cells built in this BrushBSP, to store
     std::vector<key_t> used; // every cell of this tree, grafted or built
+    std::vector<std::pair<node_t *, cell_t *>> grafted_nodes; // for the cell portals
     std::atomic<size_t> grafted = 0, total = 0;
     cell_map_t *stored = nullptr; // this hull's stored cells (looked up in parallel: never inserted into while building)
 };
 static std::unique_ptr<cell_build_t> build;
+
+// the cells of the tree being portalized (from cells_finish to cell_portals_done); elements of
+// unordered_maps keep their address until erased, and nothing is erased in between
+static std::unordered_map<const node_t *, cell_t *> portal_cells;
+static std::atomic<size_t> portal_cells_reused = 0, portal_cells_built = 0;
 
 // QBSPSERVER_DEBUG_CELLS=1: log every cell that is rebuilt
 static const bool debug_cells = std::getenv("QBSPSERVER_DEBUG_CELLS") != nullptr;
@@ -738,6 +756,7 @@ bool cell_from_cache(tree_t &tree, node_t *node, const std::vector<std::shared_p
         std::lock_guard lock(build->mutex);
         it->second.last_used = generation;
         build->used.push_back(key);
+        build->grafted_nodes.emplace_back(node, &it->second);
         build->grafted++;
         return true;
     }
@@ -780,11 +799,16 @@ void cells_finish()
         return;
     }
     cell_map_t &map_cells = *build->stored;
+    portal_cells.clear();
     for (auto &[node, key] : build->built) {
         cell_t cell;
         cell.head = record_cell(cell, node);
         cell.last_used = generation;
-        map_cells.insert_or_assign(key, std::move(cell));
+        auto [it, inserted] = map_cells.insert_or_assign(key, std::move(cell));
+        portal_cells[node] = &it->second;
+    }
+    for (auto &[node, cell] : build->grafted_nodes) {
+        portal_cells[node] = cell;
     }
     logging::print("hull {}: world tree in {} cells of {} units, {} from a previous compile\n", build->hullnum,
         build->total.load(), cell_size, build->grafted.load());
@@ -1169,6 +1193,80 @@ void hulls_like_qbsp()
     entries.clear();
     cells.clear();
     last_marks.clear();
+}
+
+cell_t *portal_cell(const node_t *node)
+{
+    if (portal_cells.empty()) {
+        return nullptr;
+    }
+    auto it = portal_cells.find(node);
+    return it == portal_cells.end() ? nullptr : it->second;
+}
+
+// a cell's nodes and leaves in a fixed order (the order record_cell / graft walk them)
+static void cell_preorder(node_t *node, std::vector<node_t *> &out)
+{
+    out.push_back(node);
+    if (auto *nodedata = node->get_nodedata()) {
+        cell_preorder(nodedata->children[0], out);
+        cell_preorder(nodedata->children[1], out);
+    }
+}
+
+bool cell_internal_portals(cell_t &cell, node_t *node, std::list<buildportal_t> &out)
+{
+    if (!cell.has_portals) {
+        return false;
+    }
+    portal_cells_reused++;
+    std::vector<node_t *> nodes;
+    cell_preorder(node, nodes);
+    for (auto &p : cell.portals) {
+        if (p.onnode >= static_cast<int32_t>(nodes.size()) || p.nodes[0] >= static_cast<int32_t>(nodes.size()) ||
+            p.nodes[1] >= static_cast<int32_t>(nodes.size())) {
+            out.clear();
+            return false; // not the subtree these portals were made for
+        }
+        buildportal_t &b = out.emplace_back();
+        b.plane = p.plane;
+        b.onnode = nodes[p.onnode];
+        b.nodes = {nodes[p.nodes[0]], nodes[p.nodes[1]]};
+        b.winding = p.winding.clone();
+    }
+    return true;
+}
+
+void cell_remember_portals(cell_t &cell, node_t *node, const std::list<buildportal_t> &portals)
+{
+    std::vector<node_t *> nodes;
+    cell_preorder(node, nodes);
+    std::unordered_map<const node_t *, int32_t> index;
+    for (size_t i = 0; i < nodes.size(); i++) {
+        index[nodes[i]] = static_cast<int32_t>(i);
+    }
+    std::vector<cell_portal_t> internal;
+    for (auto &p : portals) {
+        auto on = index.find(p.onnode), n0 = index.find(p.nodes[0]), n1 = index.find(p.nodes[1]);
+        if (on == index.end() || n0 == index.end() || n1 == index.end()) {
+            continue; // on the cell's boundary: depends on the neighbours
+        }
+        internal.push_back({p.plane, on->second, {n0->second, n1->second}, p.winding.clone()});
+    }
+    // each cell is portalized by one thread only
+    cell.portals = std::move(internal);
+    cell.has_portals = true;
+    portal_cells_built++;
+}
+
+void cell_portals_done()
+{
+    if (!portal_cells.empty()) {
+        logging::print("hullcache: portals of {} cells reused, {} built ({} cells)\n", portal_cells_reused.load(),
+            portal_cells_built.load(), portal_cells.size());
+    }
+    portal_cells_reused = portal_cells_built = 0;
+    portal_cells.clear();
 }
 
 void print_summary()

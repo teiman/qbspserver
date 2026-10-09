@@ -33,6 +33,7 @@
 #include <common/prtfile.hh>
 
 #include "tbb/task_group.h"
+#include <qbsp/hullcache.hh>
 #include "common/vectorutils.hh"
 
 contentflags_t ClusterContents(const node_t *node)
@@ -474,6 +475,27 @@ std::list<buildportal_t> MakeTreePortals_r(node_t *node, portaltype_t type, std:
         return boundary_portals;
     }
 
+    // qbspserver: a cell of a world clipping hull keeps the portals between its own leaves; only
+    // the portals on its boundary are split down its subtree (see hullcache.hh)
+    if (type == portaltype_t::TREE) {
+        if (hullcache::cell_t *cell = hullcache::portal_cell(node)) {
+            std::list<buildportal_t> internal;
+            if (hullcache::cell_internal_portals(*cell, node, internal)) {
+                auto boundary = ClipNodePortalsToTree_r(node, type, std::move(boundary_portals), stats);
+                internal.splice(internal.end(), boundary);
+                return internal;
+            }
+            // first time for this cell: portalize it normally (the cell isn't a cell below), keep
+            // what's inside
+            std::list<buildportal_t> result = MakeTreePortals_r(node, portaltype_t::NONE, std::move(boundary_portals), stats, clock);
+            hullcache::cell_remember_portals(*cell, node, result);
+            return result;
+        }
+    }
+    if (type == portaltype_t::NONE) {
+        type = portaltype_t::TREE; // (see above)
+    }
+
     // make the node portal before we move out the boundary_portals
     std::optional<buildportal_t> nodeportal = MakeNodePortal(node, boundary_portals, stats);
 
@@ -540,6 +562,7 @@ void MakeTreePortals(tree_t &tree)
         auto buildportals =
             MakeTreePortals_r(tree.headnode, portaltype_t::TREE, std::move(headnodeportals), stats, clock);
 
+        logging::header("MakePortalsFromBuildportals");
         MakePortalsFromBuildportals(tree, buildportals);
     }
 

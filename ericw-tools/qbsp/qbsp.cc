@@ -919,23 +919,18 @@ static void CountLeafs_r(node_t *node, content_stats_t &stats)
     CountLeafs_r(nodedata->children[1], stats);
 }
 
-static int NodeHeight(node_t *node)
-{
-    if (node->parent) {
-        return 1 + NodeHeight(node->parent);
-    }
-    return 1;
-}
 
-static void CountLeafHeights_r(node_t *node, std::vector<int> &heights)
+// `height`: the number of nodes from `node` up to the root, both included (1 for the root).
+// Counted on the way down: walking up from every leaf cost leaves x depth.
+static void CountLeafHeights_r(node_t *node, int height, std::vector<int> &heights)
 {
     if (node->is_leaf()) {
-        heights.push_back(NodeHeight(node));
+        heights.push_back(height);
         return;
     }
     auto *nodedata = node->get_nodedata();
-    CountLeafHeights_r(nodedata->children[0], heights);
-    CountLeafHeights_r(nodedata->children[1], heights);
+    CountLeafHeights_r(nodedata->children[0], height + 1, heights);
+    CountLeafHeights_r(nodedata->children[1], height + 1, heights);
 }
 
 void CountLeafs(node_t *headnode)
@@ -950,7 +945,12 @@ void CountLeafs(node_t *headnode)
     logging::stat_tracker_t stat_print;
 
     std::vector<int> leaf_heights;
-    CountLeafHeights_r(headnode, leaf_heights);
+    // headnode may be a subtree (its parent set): heights still count up to the real root
+    int height = 1;
+    for (const node_t *n = headnode; n->parent; n = n->parent) {
+        height++;
+    }
+    CountLeafHeights_r(headnode, height, leaf_heights);
 
     const int max_height = *std::max_element(leaf_heights.begin(), leaf_heights.end());
     stat_print.register_stat("max tree height").count += max_height;
@@ -1151,6 +1151,7 @@ static void ProcessEntity(mapentity_t &entity, hull_index_t hullnum)
             BrushBSP(tree, entity, brushes, final_split);
             hullcache::cell_hull_end();
             MakeTreePortals(tree);
+            hullcache::cell_portals_done();
             filled = FillOutside(tree, hullnum, brushes);
             if (filled && qbsp_options.filldetail.value())
                 FillDetail(tree, hullnum, brushes);
@@ -1176,6 +1177,7 @@ static void ProcessEntity(mapentity_t &entity, hull_index_t hullnum)
 
                     // fill again so PruneNodes works
                     MakeTreePortals(tree);
+                    hullcache::cell_portals_done();
                     FillOutside(tree, hullnum, brushes);
                     if (qbsp_options.filldetail.value())
                         FillDetail(tree, hullnum, brushes);

@@ -13,6 +13,7 @@
 #include <common/aabb.hh>
 
 #include <cstddef>
+#include <list>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -22,6 +23,7 @@ class mapentity_t;
 struct node_t;
 struct tree_t;
 struct bspbrush_t;
+struct buildportal_t;
 
 /*
  * The clipping hulls (1, 2...) are most of a compile's time, and they only depend on the
@@ -98,6 +100,23 @@ std::optional<size_t> grid_plane(const aabb3d &bounds);
 bool cell_from_cache(tree_t &tree, node_t *node, const std::vector<std::shared_ptr<bspbrush_t>> &brushes);
 // after building: stores the cells that were built
 void cells_finish();
+
+/*
+ * Cell portals: a portal is made from its node's plane clipped by every parent's plane, then
+ * split down both sides. Inside a cell, the parents above the cell are grid planes, so the
+ * portals between two leaves of the same cell only depend on the cell's box and subtree: a
+ * cell keeps them with its subtree. MakeTreePortals_r (portals.cc) then only has to split the
+ * portals on the cell's boundary down the cell's subtree. Active for the tree whose BrushBSP
+ * just ran with cells, until cell_portals_done().
+ */
+struct cell_t;
+// the cell whose root is `node` in the tree being portalized, or nullptr
+cell_t *portal_cell(const node_t *node);
+// the stored portals between two leaves of the cell; false if the cell has none stored yet
+bool cell_internal_portals(cell_t &cell, node_t *node, std::list<buildportal_t> &out);
+// after portalizing a cell normally: keep its internal portals
+void cell_remember_portals(cell_t &cell, node_t *node, const std::list<buildportal_t> &portals);
+void cell_portals_done();
 
 /*
  * qbsp chops the clipping hulls' brushes (removes their overlaps) so that BrushBSP has fewer
