@@ -106,6 +106,15 @@ struct entry_t
 };
 
 static bool is_enabled = false;
+
+// the cell grid / unchopped clipping hulls (see limits_exceeded in hullcache.hh)
+enum class grid_mode_t
+{
+    on, // default
+    off_for_limits, // the output didn't fit with the grid: hulls built like plain qbsp
+    on_extended, // it didn't fit without the grid either: plain qbsp switches format too
+};
+static grid_mode_t grid_mode = grid_mode_t::on;
 static uint64_t generation = 0;
 static std::unordered_map<key_t, entry_t, key_hash> entries;
 
@@ -545,7 +554,7 @@ static void prune_cells(uint64_t oldest)
 void cell_hull_begin(int hullnum)
 {
     build.reset();
-    if (is_enabled) {
+    if (is_enabled && grid_mode != grid_mode_t::off_for_limits) {
         build = std::make_unique<cell_build_t>();
         build->hullnum = hullnum;
     }
@@ -1115,7 +1124,51 @@ bool hull0_reuse(tree_t &tree, mapentity_t &entity, const std::vector<std::share
 bool chop_world_hulls()
 {
     static const bool force_chop = std::getenv("QBSPSERVER_CHOP_HULLS") != nullptr;
-    return !is_enabled || force_chop;
+    return !is_enabled || force_chop || grid_mode == grid_mode_t::off_for_limits;
+}
+
+std::optional<size_t> fake_clipnode_limit()
+{
+    static const char *env = std::getenv("QBSPSERVER_FAKE_CLIPNODE_LIMIT");
+    if (!env || !is_enabled) {
+        return std::nullopt;
+    }
+    return static_cast<size_t>(std::strtoull(env, nullptr, 10));
+}
+
+bool grid_active()
+{
+    return is_enabled && grid_mode == grid_mode_t::on;
+}
+
+void check_limits(bool fits, size_t clipnodes)
+{
+    if (!is_enabled) {
+        return;
+    }
+    if (auto fake = fake_clipnode_limit(); fake && clipnodes > *fake) {
+        fits = false;
+    }
+    if (fits) {
+        return;
+    }
+    if (grid_mode == grid_mode_t::on) {
+        throw limits_exceeded();
+    }
+    if (grid_mode == grid_mode_t::off_for_limits) {
+        // plain qbsp would not fit either: the grid isn't the reason, put it back
+        logging::print("hullcache: the map doesn't fit the format without the cell grid either; grid back on\n");
+        grid_mode = grid_mode_t::on_extended;
+    }
+}
+
+void hulls_like_qbsp()
+{
+    grid_mode = grid_mode_t::off_for_limits;
+    // the stored clipping hulls were built with the grid: drop them
+    entries.clear();
+    cells.clear();
+    last_marks.clear();
 }
 
 void print_summary()

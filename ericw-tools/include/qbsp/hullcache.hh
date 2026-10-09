@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <vector>
 
 class mapentity_t;
@@ -105,6 +106,28 @@ void cells_finish();
  * The solid space is the same either way. QBSPSERVER_CHOP_HULLS=1 chops anyway (to compare).
  */
 bool chop_world_hulls();
+
+/*
+ * The cell grid (and not chopping) gives the clipping hulls 6-14% more clipnodes. A map that
+ * just fits a format's limits with plain qbsp (BSP29: 32767 clipnodes) could then not fit, and
+ * qbsp would silently switch to the extended format (BSP2), which the mapper's engine may not
+ * load. So when the output doesn't fit while the grid is on, FinishBSPFile throws
+ * limits_exceeded instead; the server turns the grid off (hulls_like_qbsp) and compiles again.
+ * If the map doesn't fit without the grid either, plain qbsp would switch format too: the grid
+ * goes back on and the format switches as usual. QBSPSERVER_FAKE_CLIPNODE_LIMIT=N pretends the
+ * format holds N clipnodes (to test this).
+ */
+struct limits_exceeded : std::runtime_error
+{
+    limits_exceeded() : std::runtime_error("the output exceeds the format's limits with the cell grid") { }
+};
+// called by FinishBSPFile; `fits`: the output fits the requested format
+void check_limits(bool fits, size_t clipnodes);
+// whether to throw limits_exceeded (the grid is on and could be the reason)
+bool grid_active();
+// after limits_exceeded: build the clipping hulls like plain qbsp (no grid, chopped)
+void hulls_like_qbsp();
+std::optional<size_t> fake_clipnode_limit();
 
 /*
  * Hull 0 of the world: its final tree (before filling) only depends on the brushes (shapes,

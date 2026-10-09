@@ -24,6 +24,7 @@
 
 #include <common/log.hh>
 #include <qbsp/qbsp.hh>
+#include <qbsp/hullcache.hh>
 
 #include <vector>
 #include <algorithm>
@@ -420,7 +421,13 @@ static void WriteBSPFile()
     const size_t num_faces = std::get<mbsp_t>(bspdata.bsp).dfaces.size();
 
     // convert to output format
-    if (!ConvertBSPFormat(&bspdata, qbsp_options.target_version)) {
+    const size_t num_clipnodes = std::get<mbsp_t>(bspdata.bsp).dclipnodes.size();
+    // (the faked limit first: a conversion that doesn't happen leaves bspdata as it was)
+    const bool fits = hullcache::fake_clipnode_limit().value_or(SIZE_MAX) >= num_clipnodes &&
+                      ConvertBSPFormat(&bspdata, qbsp_options.target_version);
+    // qbspserver: the cell grid must not be the reason to switch to an extended format
+    hullcache::check_limits(fits, num_clipnodes);
+    if (!fits) {
         const bspversion_t *extendedLimitsFormat = qbsp_options.target_version->extended_limits;
 
         if (!extendedLimitsFormat) {

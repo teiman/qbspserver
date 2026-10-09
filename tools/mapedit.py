@@ -18,7 +18,8 @@ import re
 import sys
 import zlib
 
-SCENARIO_VERSION = 1
+SCENARIO_VERSION = 2
+# 2: + bigmove (a big brush: walls, floors span many cells), + align (texture alignment)
 
 # name -> (description, edits). An edit is (kind, count); a float count is a fraction of the candidates.
 SCENARIOS = {
@@ -26,6 +27,8 @@ SCENARIOS = {
     'entity':   ('1 point entity changed (moved 16u, light value)', [('entity', 1)]),
     'texture':  ('1 brush retextured', [('texture', 1)]),
     'move':     ('1 small brush moved 8u', [('move', 1)]),
+    'bigmove':  ('1 big brush (>= 512u) moved 8u', [('bigmove', 1)]),
+    'align':    ('1 brush\'s texture alignment shifted 16 texels', [('align', 1)]),
     'add':      ('1 brush added', [('add', 1)]),
     'geotex':   ('3 moved + 3 retextured + 1 added', [('move', 3), ('texture', 3), ('add', 1)]),
     'many':     ('2% moved + 2% retextured + 10 added + 10 entities',
@@ -45,6 +48,7 @@ HIDDEN_TEXTURES = ('skip',)
 # entities that qbsp merges into the world: their brushes are candidates for edits
 WORLD_CLASSES = ('worldspawn', 'func_group', 'func_detail', 'func_detail_wall')
 SMALL_BRUSH = 128  # a brush this big or smaller (on every axis) is a prop / trim, unlikely to seal the map
+BIG_BRUSH = 512  # a brush this big on some axis is a wall / floor / ceiling: it spans several cells
 MOVE_DIST = 8
 
 
@@ -172,6 +176,23 @@ def write_map(entities):
     return '\n'.join(e.text() for e in entities) + '\n'
 
 
+def shift_alignment(rest, texels):
+    """Adds `texels` to the horizontal texture offset of a face's alignment text.
+
+    Standard format: ' xoff yoff rot xscale yscale'; Valve 220: ' [ ux uy uz uoff ] [ ... ] rot sx sy'."""
+    tokens = rest.split()
+    if not tokens:
+        return rest
+    i = 4 if tokens[0] == '[' else 0  # the u offset in Valve 220, the x offset otherwise
+    if i >= len(tokens):
+        return rest
+    try:
+        tokens[i] = fmt_num(float(tokens[i]) + texels)
+    except ValueError:
+        return rest
+    return ' ' + ' '.join(tokens)
+
+
 def is_special(texture):
     t = texture.lower()
     return t.startswith(SPECIAL_PREFIXES)
@@ -231,7 +252,7 @@ def box_brush(center, half, texture):
 
 def can_leak(name):
     """Whether a scenario removes geometry somewhere, which may open a hole to the void."""
-    return any(kind == 'move' for kind, _ in SCENARIOS[name][1])
+    return any(kind in ('move', 'bigmove') for kind, _ in SCENARIOS[name][1])
 
 
 def apply_scenario(entities, name, attempt=0):
@@ -247,6 +268,7 @@ def apply_scenario(entities, name, attempt=0):
     plain = [b for e in entities if e.get('classname') in WORLD_CLASSES for b in e.brushes if plain_brush(b)]
     textures = sorted({f.texture for b in plain for f in b.faces if not is_hidden(f.texture)})
     small = [b for b in plain if all(hi - lo <= SMALL_BRUSH for lo, hi in zip(*b.bounds()))]
+    big = [b for b in plain if any(hi - lo >= BIG_BRUSH for lo, hi in zip(*b.bounds()))]
     # most used plain texture, for added brushes
     usage = {}
     for b in plain:
@@ -256,8 +278,8 @@ def apply_scenario(entities, name, attempt=0):
     common_tex = max(sorted(usage), key=lambda t: usage[t]) if usage else 'base'
 
     for kind, count in edits:
-        if kind == 'move':
-            for b in pick(rnd, small, count):
+        if kind in ('move', 'bigmove'):
+            for b in pick(rnd, small if kind == 'move' else big, count):
                 axis = rnd.randrange(3)
                 d = MOVE_DIST if rnd.random() < 0.5 else -MOVE_DIST
                 for f in b.faces:
@@ -265,6 +287,11 @@ def apply_scenario(entities, name, attempt=0):
                         f.points[i] += d
                 lo, _ = b.bounds()
                 log.append(f'move brush near ({fmt_num(lo[0])} {fmt_num(lo[1])} {fmt_num(lo[2])}) {"xyz"[axis]}{d:+d}')
+        elif kind == 'align':
+            for b in pick(rnd, plain, count):
+                for f in b.faces:
+                    f.rest = shift_alignment(f.rest, 16)
+                log.append(f'shift texture alignment of brush {",".join(sorted(b.textures()))} by 16')
         elif kind == 'texture':
             for b in pick(rnd, plain, count):
                 old = sorted(t for t in b.textures() if not is_hidden(t))

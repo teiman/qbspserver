@@ -126,3 +126,6 @@ desktop.ini
 progs.dat
 progs.lno
 *.pak
+
+# ...except our placeholder for e3m4 (tools/makewad.py), which is ours to share
+!testmap/gfx/e3m4_placeholder.wad

@@ -156,6 +156,14 @@ static int compile(const std::vector<std::string> &args)
         return net::EXIT_OK;
     } catch (const settings::quit_after_help_exception &) {
         throw;
+    } catch (const hullcache::limits_exceeded &) {
+        // plain qbsp might have fit the format: build the clipping hulls like it does and retry
+        // (see hullcache.hh). It stays that way for this server.
+        logging::print("qbspserver: with the cell grid the output doesn't fit the format; compiling again "
+                       "with the clipping hulls built like plain qbsp\n");
+        logging::close();
+        hullcache::hulls_like_qbsp();
+        return compile(args);
     } catch (const std::exception &e) {
         logging::print("************ ERROR ************\n{}\n", e.what());
         logging::print("{}", logging::bench_report());

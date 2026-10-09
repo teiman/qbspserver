@@ -6,7 +6,8 @@ long as the game can't tell. So this compares what the game sees, not the bytes:
 
   entities   the entity lump, exactly (after normalizing whitespace)
   models     the same number of models (world + brush entities)
-  surfaces   per model and texture: drawn area, and its area-weighted centre (catches moved geometry)
+  surfaces   per model and texture: drawn area, its area-weighted centre (catches moved geometry)
+             and area-weighted texture coordinates (catches changed texture alignment)
   contents   point contents (empty, solid, water, sky...) in hulls 0, 1 and 2 (drawing, player and
              shambler collision), at random points in every model and on both sides of every face
              that has no twin in the other BSP (the changed areas)
@@ -34,6 +35,7 @@ HULL_BOXES = {1: ((-16, -16, -24), (16, 16, 32)), 2: ((-32, -32, -24), (32, 32, 
 MAX_CONTENTS_MISMATCH = 0.0005  # fraction of the sampled points
 AREA_TOLERANCE = 1e-4  # relative to the texture's area, + 1 unit^2
 CENTRE_TOLERANCE = 1e-3  # units the area-weighted centre may move (x area), + 1
+ALIGN_TOLERANCE = 1e-3  # texels the area-weighted texture coordinates may move (x area), + 1
 MAX_FACE_SAMPLES = 20000  # faces without a twin that get points on both sides
 
 
@@ -63,7 +65,9 @@ class Bsp:
         # mins, maxs, headnode[4], firstface, numfaces
         self.models = [(m[0:3], m[3:6], m[9:13], m[14], m[15])
                        for m in struct.iter_unpack('<9f4i3i', lump(LUMP_MODELS))]
-        self.texinfo_miptex = [t[8] for t in struct.iter_unpack('<8f2i', lump(LUMP_TEXINFO))]
+        texinfo = list(struct.iter_unpack('<8f2i', lump(LUMP_TEXINFO)))
+        self.texinfo_miptex = [t[8] for t in texinfo]
+        self.texinfo_vecs = [(t[0:4], t[4:8]) for t in texinfo]
         self.texture_names = self._texture_names(lump(LUMP_TEXTURES))
 
         if bsp2:
@@ -120,7 +124,7 @@ class Bsp:
         return num
 
     def face_info(self):
-        """[(model, texture, area, centre, normal)] for every drawn face."""
+        """[(model, texture, area, centre, normal, (s, t) at the centre)] for every drawn face."""
         if self._face_info is not None:
             return self._face_info
         info = []
@@ -135,7 +139,10 @@ class Bsp:
                 area, centre = polygon_area_centre(pts)
                 nx, ny, nz, _ = self.planes[planenum]
                 normal = (-nx, -ny, -nz) if side else (nx, ny, nz)
-                info.append((m, name, area, centre, normal))
+                (sx, sy, sz, so), (tx, ty, tz, to) = self.texinfo_vecs[texinfo]
+                cx, cy, cz = centre
+                st = (cx * sx + cy * sy + cz * sz + so, cx * tx + cy * ty + cz * tz + to)
+                info.append((m, name, area, centre, normal, st))
         self._face_info = info
         return info
 
@@ -178,19 +185,21 @@ def normalize_entities(text):
 
 
 def surface_totals(bsp):
-    """{(model, texture): [area, moment x, y, z]}"""
+    """{(model, texture): [area, moment x, y, z, moment s, t]}"""
     totals = {}
-    for m, name, area, (cx, cy, cz), _ in bsp.face_info():
-        t = totals.setdefault((m, name), [0.0, 0.0, 0.0, 0.0])
+    for m, name, area, (cx, cy, cz), _, (fs, ft) in bsp.face_info():
+        t = totals.setdefault((m, name), [0.0] * 6)
         t[0] += area
         t[1] += area * cx
         t[2] += area * cy
         t[3] += area * cz
+        t[4] += area * fs
+        t[5] += area * ft
     return totals
 
 
 def face_key(face):
-    m, name, area, (cx, cy, cz), _ = face
+    m, name, area, (cx, cy, cz), *_ = face
     return (m, name, round(area), round(cx * 2), round(cy * 2), round(cz * 2))
 
 
@@ -238,16 +247,18 @@ def compare(a, b, points=20000, seed=1):
     sa, sb = surface_totals(a), surface_totals(b)
     bad = []
     for key in sorted(set(sa) | set(sb)):
-        ta, tb = sa.get(key, [0.0] * 4), sb.get(key, [0.0] * 4)
+        ta, tb = sa.get(key, [0.0] * 6), sb.get(key, [0.0] * 6)
         area = max(ta[0], tb[0])
         darea = abs(ta[0] - tb[0])
-        dmoment = math.sqrt(sum((x - y) ** 2 for x, y in zip(ta[1:], tb[1:])))
-        if darea > AREA_TOLERANCE * area + 1 or dmoment > CENTRE_TOLERANCE * area + 1:
-            bad.append((key, ta[0], tb[0], dmoment / max(area, 1)))
+        dmoment = math.sqrt(sum((x - y) ** 2 for x, y in zip(ta[1:4], tb[1:4])))
+        dalign = math.sqrt(sum((x - y) ** 2 for x, y in zip(ta[4:6], tb[4:6])))
+        if (darea > AREA_TOLERANCE * area + 1 or dmoment > CENTRE_TOLERANCE * area + 1
+                or dalign > ALIGN_TOLERANCE * area + 1):
+            bad.append((key, ta[0], tb[0], dmoment / max(area, 1), dalign / max(area, 1)))
     if bad:
-        (m, tex), x, y, shift = bad[0]
+        (m, tex), x, y, shift, align = bad[0]
         fail(f'surfaces: {len(bad)} model/texture groups differ, e.g. model {m} {tex}: '
-             f'area {x:.0f} vs {y:.0f}, centre moved {shift:.3f}u')
+             f'area {x:.0f} vs {y:.0f}, centre moved {shift:.3f}u, texture coordinates moved {align:.3f} texels')
     else:
         lines.append(f'ok   surfaces: {len(sb)} model/texture groups, {sum(t[0] for t in sb.values()):.0f} units^2')
 
@@ -267,7 +278,7 @@ def compare(a, b, points=20000, seed=1):
 
     for hull in (0, 1, 2):
         face_points = []
-        for m, _, _, (cx, cy, cz), n in changed:
+        for m, _, _, (cx, cy, cz), n, _ in changed:
             # 1 unit on each side of the surface (of the expanded plane for hulls 1 and 2)
             off = hull_offset(hull, n)
             for d in (off + 1, off - 1):
