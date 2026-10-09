@@ -18330,3 +18330,2435 @@
      ok   hull 1 contents: 0 of 46300 random differ
      ok   hull 2 contents: 0 of 46300 random differ
 
+==== 2026-10-09 22:47:33  [facing index in SelectSplitPlane (exact; plain qbsp quakemash 273 s -> 156 s)]  build=515c0f20 (10-09 22:38)  reps=3  qbsp -bsp2  TOTAL=18.442s
+-- small: initial full compile 1.842s
+-- small / nochange: recompile without changes
+   times: 0.038 0.031 0.034  median 0.034s  reverts: 0.029 0.035 0.029
+   server phases (median repetition):
+   reference qbsp: 2.359 2.091 1.641  median 2.091s
+         0.032s  LoadMapFile
+         0.008s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.005s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.060s  hull 0: BrushBSP auto
+         0.017s  hull 0: CountLeafs (x3)
+         0.041s  hull 0: MakeTreePortals (x3)
+         0.017s  hull 0: MakePortalsFromBuildportals (x3)
+         0.004s  hull 0: CalcTreeBounds (x3)
+         0.007s  hull 0: FillOutside (x2)
+         0.009s  hull 0: FillDetail (x2)
+         0.045s  hull 0: BrushBSP precise
+         0.002s  hull 0: MarkVisibleSides
+         0.010s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.025s  hull 0: WritePortalFile
+         0.015s  hull 0: TJunc
+         0.014s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 0 bmodels: CountBrushes (x57)
+         0.013s  hull 0 bmodels: BrushBSP fast (x57)
+         0.004s  hull 0 bmodels: CountLeafs (x171)
+         0.014s  hull 0 bmodels: MakeTreePortals (x114)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x114)
+         0.003s  hull 0 bmodels: CalcTreeBounds (x114)
+         0.001s  hull 0 bmodels: FillBrushEntity (x57)
+         0.012s  hull 0 bmodels: BrushBSP precise (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.002s  hull 0 bmodels: MakeFaces (x57)
+         0.001s  hull 0 bmodels: PruneNodes (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.002s  hull 0 bmodels: EmitFaces (x57)
+         0.000s  hull 1: (start)
+         0.013s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.046s  hull 1: ChopBrushes
+         0.263s  hull 1: BrushBSP fast
+         0.021s  hull 1: CountLeafs (x3)
+         0.162s  hull 1: MakeTreePortals (x2)
+         0.049s  hull 1: MakePortalsFromBuildportals (x2)
+         0.011s  hull 1: CalcTreeBounds (x2)
+         0.032s  hull 1: FillOutside (x2)
+         0.014s  hull 1: FillDetail (x2)
+         0.117s  hull 1: BrushBSP precise
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.002s  hull 1 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 1 bmodels: CountBrushes (x57)
+         0.001s  hull 1 bmodels: ChopBrushes (x57)
+         0.015s  hull 1 bmodels: BrushBSP fast (x57)
+         0.001s  hull 1 bmodels: CountLeafs (x57)
+         0.000s  hull 2: (start)
+         0.012s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.056s  hull 2: ChopBrushes
+         0.336s  hull 2: BrushBSP fast
+         0.024s  hull 2: CountLeafs (x3)
+         0.145s  hull 2: MakeTreePortals (x2)
+         0.057s  hull 2: MakePortalsFromBuildportals (x2)
+         0.012s  hull 2: CalcTreeBounds (x2)
+         0.034s  hull 2: FillOutside (x2)
+         0.016s  hull 2: FillDetail (x2)
+         0.220s  hull 2: BrushBSP precise
+         0.003s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.002s  hull 2 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 2 bmodels: CountBrushes (x57)
+         0.001s  hull 2 bmodels: ChopBrushes (x57)
+         0.015s  hull 2 bmodels: BrushBSP fast (x57)
+         0.001s  hull 2 bmodels: CountLeafs (x57)
+         0.000s  (after hull 2 bmodels)
+         0.019s  FinishBSPFile
+   BENCH status=done elapsed=2.073 phase=1727 name="FinishBSPFile" count=0 max=0 pct=0.00 units=955523
+   check: SAME
+     ok   entities: 1959 lines identical
+     ok   models: 58
+     ok   surfaces: 151 model/texture groups, 26010356 units^2
+     ok   hull 0 contents: 0 of 25700 random differ
+     ok   hull 1 contents: 0 of 25700 random differ
+     ok   hull 2 contents: 0 of 25700 random differ
+-- small / entity: 1 point entity changed (moved 16u, light value)
+     edit: light at (1496 856 -504) moved x+16
+   times: 0.252 0.225 0.195  median 0.225s  (server 0.193s)  reverts: 0.242 0.232 0.195
+   server phases (median repetition):
+         0.002s  (init)
+         0.029s  LoadMapFile
+         0.007s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.004s  hull 0: CountBrushes
+         0.017s  hull 0: MakeTreePortals (x2)
+         0.005s  hull 0: MakePortalsFromBuildportals (x2)
+         0.002s  hull 0: CalcTreeBounds (x2)
+         0.002s  hull 0: FillOutside
+         0.002s  hull 0: FillDetail
+         0.002s  hull 0: MarkVisibleSides
+         0.009s  hull 0: MakeFaces
+         0.000s  hull 0: PruneNodes
+         0.023s  hull 0: WritePortalFile
+         0.015s  hull 0: CountLeafs
+         0.014s  hull 0: TJunc
+         0.011s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.001s  hull 0 bmodels: CountBrushes (x57)
+         0.007s  hull 0 bmodels: MakeTreePortals (x57)
+         0.000s  hull 0 bmodels: MakePortalsFromBuildportals (x57)
+         0.001s  hull 0 bmodels: CalcTreeBounds (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.002s  hull 0 bmodels: MakeFaces (x57)
+         0.001s  hull 0 bmodels: PruneNodes (x57)
+         0.002s  hull 0 bmodels: CountLeafs (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.004s  hull 1: (start)
+         0.001s  hull 1 bmodels: (start)
+         0.003s  hull 2: (start)
+         0.000s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.016s  FinishBSPFile
+   BENCH status=done elapsed=0.193 phase=655 name="FinishBSPFile" count=0 max=0 pct=0.00 units=55014
+   reference qbsp: 2.212 1.972 1.612  median 1.972s
+         0.033s  LoadMapFile
+         0.009s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.059s  hull 0: BrushBSP auto
+         0.019s  hull 0: CountLeafs (x3)
+         0.042s  hull 0: MakeTreePortals (x3)
+         0.017s  hull 0: MakePortalsFromBuildportals (x3)
+         0.004s  hull 0: CalcTreeBounds (x3)
+         0.008s  hull 0: FillOutside (x2)
+         0.009s  hull 0: FillDetail (x2)
+         0.043s  hull 0: BrushBSP precise
+         0.003s  hull 0: MarkVisibleSides
+         0.012s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.027s  hull 0: WritePortalFile
+         0.014s  hull 0: TJunc
+         0.014s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.002s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 0 bmodels: CountBrushes (x57)
+         0.013s  hull 0 bmodels: BrushBSP fast (x57)
+         0.004s  hull 0 bmodels: CountLeafs (x171)
+         0.016s  hull 0 bmodels: MakeTreePortals (x114)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x114)
+         0.003s  hull 0 bmodels: CalcTreeBounds (x114)
+         0.001s  hull 0 bmodels: FillBrushEntity (x57)
+         0.013s  hull 0 bmodels: BrushBSP precise (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.002s  hull 0 bmodels: MakeFaces (x57)
+         0.001s  hull 0 bmodels: PruneNodes (x57)
+         0.004s  hull 0 bmodels: TJunc (x57)
+         0.002s  hull 0 bmodels: EmitFaces (x57)
+         0.000s  hull 1: (start)
+         0.012s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.046s  hull 1: ChopBrushes
+         0.268s  hull 1: BrushBSP fast
+         0.019s  hull 1: CountLeafs (x3)
+         0.137s  hull 1: MakeTreePortals (x2)
+         0.051s  hull 1: MakePortalsFromBuildportals (x2)
+         0.011s  hull 1: CalcTreeBounds (x2)
+         0.033s  hull 1: FillOutside (x2)
+         0.015s  hull 1: FillDetail (x2)
+         0.119s  hull 1: BrushBSP precise
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.003s  hull 1 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 1 bmodels: CountBrushes (x57)
+         0.001s  hull 1 bmodels: ChopBrushes (x57)
+         0.015s  hull 1 bmodels: BrushBSP fast (x57)
+         0.001s  hull 1 bmodels: CountLeafs (x57)
+         0.000s  hull 2: (start)
+         0.012s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.055s  hull 2: ChopBrushes
+         0.304s  hull 2: BrushBSP fast
+         0.021s  hull 2: CountLeafs (x3)
+         0.144s  hull 2: MakeTreePortals (x2)
+         0.053s  hull 2: MakePortalsFromBuildportals (x2)
+         0.012s  hull 2: CalcTreeBounds (x2)
+         0.029s  hull 2: FillOutside (x2)
+         0.017s  hull 2: FillDetail (x2)
+         0.157s  hull 2: BrushBSP precise
+         0.002s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.002s  hull 2 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 2 bmodels: CountBrushes (x57)
+         0.001s  hull 2 bmodels: ChopBrushes (x57)
+         0.013s  hull 2 bmodels: BrushBSP fast (x57)
+         0.001s  hull 2 bmodels: CountLeafs (x57)
+         0.000s  (after hull 2 bmodels)
+         0.017s  FinishBSPFile
+   BENCH status=done elapsed=1.952 phase=1727 name="FinishBSPFile" count=0 max=0 pct=0.00 units=955523
+   check: SAME
+     ok   entities: 1959 lines identical
+     ok   models: 58
+     ok   surfaces: 151 model/texture groups, 26010356 units^2
+     ok   hull 0 contents: 0 of 25700 random differ
+     ok   hull 1 contents: 0 of 25700 random differ
+     ok   hull 2 contents: 0 of 25700 random differ
+-- small / texture: 1 brush retextured
+     edit: retexture brush GROUND1_2 -> COMP1_2
+   times: 0.249 0.191 0.190  median 0.191s  (server 0.166s)  reverts: 0.255 0.192 0.193
+   server phases (median repetition):
+         0.001s  (init)
+         0.026s  LoadMapFile
+         0.006s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.004s  hull 0: CountBrushes
+         0.014s  hull 0: MakeTreePortals (x2)
+         0.005s  hull 0: MakePortalsFromBuildportals (x2)
+         0.002s  hull 0: CalcTreeBounds (x2)
+         0.002s  hull 0: FillOutside
+         0.002s  hull 0: FillDetail
+         0.002s  hull 0: MarkVisibleSides
+         0.008s  hull 0: MakeFaces
+         0.000s  hull 0: PruneNodes
+         0.019s  hull 0: WritePortalFile
+         0.013s  hull 0: CountLeafs
+         0.011s  hull 0: TJunc
+         0.010s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.001s  hull 0 bmodels: CountBrushes (x57)
+         0.005s  hull 0 bmodels: MakeTreePortals (x57)
+         0.000s  hull 0 bmodels: MakePortalsFromBuildportals (x57)
+         0.001s  hull 0 bmodels: CalcTreeBounds (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.000s  hull 0 bmodels: PruneNodes (x57)
+         0.002s  hull 0 bmodels: CountLeafs (x57)
+         0.002s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.003s  hull 1: (start)
+         0.000s  hull 1 bmodels: (start)
+         0.002s  hull 2: (start)
+         0.000s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.013s  FinishBSPFile
+   BENCH status=done elapsed=0.166 phase=655 name="FinishBSPFile" count=0 max=0 pct=0.00 units=55015
+   reference qbsp: 2.100 1.559 1.609  median 1.609s
+         0.027s  LoadMapFile
+         0.008s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.054s  hull 0: BrushBSP auto
+         0.015s  hull 0: CountLeafs (x3)
+         0.032s  hull 0: MakeTreePortals (x3)
+         0.015s  hull 0: MakePortalsFromBuildportals (x3)
+         0.004s  hull 0: CalcTreeBounds (x3)
+         0.006s  hull 0: FillOutside (x2)
+         0.007s  hull 0: FillDetail (x2)
+         0.036s  hull 0: BrushBSP precise
+         0.003s  hull 0: MarkVisibleSides
+         0.009s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.042s  hull 0: WritePortalFile
+         0.010s  hull 0: TJunc
+         0.012s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 0 bmodels: CountBrushes (x57)
+         0.011s  hull 0 bmodels: BrushBSP fast (x57)
+         0.003s  hull 0 bmodels: CountLeafs (x171)
+         0.013s  hull 0 bmodels: MakeTreePortals (x114)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x114)
+         0.002s  hull 0 bmodels: CalcTreeBounds (x114)
+         0.001s  hull 0 bmodels: FillBrushEntity (x57)
+         0.011s  hull 0 bmodels: BrushBSP precise (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.001s  hull 0 bmodels: PruneNodes (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.000s  hull 1: (start)
+         0.009s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.036s  hull 1: ChopBrushes
+         0.209s  hull 1: BrushBSP fast
+         0.018s  hull 1: CountLeafs (x3)
+         0.106s  hull 1: MakeTreePortals (x2)
+         0.042s  hull 1: MakePortalsFromBuildportals (x2)
+         0.010s  hull 1: CalcTreeBounds (x2)
+         0.026s  hull 1: FillOutside (x2)
+         0.013s  hull 1: FillDetail (x2)
+         0.094s  hull 1: BrushBSP precise
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.002s  hull 1 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 1 bmodels: CountBrushes (x57)
+         0.001s  hull 1 bmodels: ChopBrushes (x57)
+         0.010s  hull 1 bmodels: BrushBSP fast (x57)
+         0.001s  hull 1 bmodels: CountLeafs (x57)
+         0.000s  hull 2: (start)
+         0.009s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.046s  hull 2: ChopBrushes
+         0.245s  hull 2: BrushBSP fast
+         0.019s  hull 2: CountLeafs (x3)
+         0.109s  hull 2: MakeTreePortals (x2)
+         0.047s  hull 2: MakePortalsFromBuildportals (x2)
+         0.010s  hull 2: CalcTreeBounds (x2)
+         0.028s  hull 2: FillOutside (x2)
+         0.013s  hull 2: FillDetail (x2)
+         0.123s  hull 2: BrushBSP precise
+         0.002s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.002s  hull 2 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 2 bmodels: CountBrushes (x57)
+         0.001s  hull 2 bmodels: ChopBrushes (x57)
+         0.011s  hull 2 bmodels: BrushBSP fast (x57)
+         0.001s  hull 2 bmodels: CountLeafs (x57)
+         0.000s  (after hull 2 bmodels)
+         0.016s  FinishBSPFile
+   BENCH status=done elapsed=1.592 phase=1727 name="FinishBSPFile" count=0 max=0 pct=0.00 units=955524
+   check: SAME
+     ok   entities: 1959 lines identical
+     ok   models: 58
+     ok   surfaces: 151 model/texture groups, 26010356 units^2
+     ok   hull 0 contents: 0 of 25700 random differ
+     ok   hull 1 contents: 0 of 25700 random differ
+     ok   hull 2 contents: 0 of 25700 random differ
+-- small / move: 1 small brush moved 8u
+     edit: move brush near (120 2760 128) y-8
+   times: 0.677 0.493 0.496  median 0.496s  (server 0.466s)  reverts: 0.246 0.186 0.248
+   server phases (median repetition):
+         0.001s  (init)
+         0.024s  LoadMapFile
+         0.007s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.003s  hull 0: Brush_LoadEntity
+         0.001s  hull 0: CountBrushes
+         0.049s  hull 0: BrushBSP auto
+         0.015s  hull 0: CountLeafs (x3)
+         0.033s  hull 0: MakeTreePortals (x3)
+         0.009s  hull 0: MakePortalsFromBuildportals (x3)
+         0.011s  hull 0: CalcTreeBounds (x3)
+         0.006s  hull 0: FillOutside (x2)
+         0.006s  hull 0: FillDetail (x2)
+         0.034s  hull 0: BrushBSP precise
+         0.002s  hull 0: MarkVisibleSides
+         0.009s  hull 0: MakeFaces
+         0.000s  hull 0: PruneNodes
+         0.020s  hull 0: WritePortalFile
+         0.012s  hull 0: TJunc
+         0.011s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.001s  hull 0 bmodels: CountBrushes (x57)
+         0.005s  hull 0 bmodels: MakeTreePortals (x57)
+         0.000s  hull 0 bmodels: MakePortalsFromBuildportals (x57)
+         0.001s  hull 0 bmodels: CalcTreeBounds (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.000s  hull 0 bmodels: PruneNodes (x57)
+         0.002s  hull 0 bmodels: CountLeafs (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.001s  hull 1: (start)
+         0.010s  hull 1: Brush_LoadEntity
+         0.001s  hull 1: CountBrushes
+         0.019s  hull 1: BrushBSP precise
+         0.007s  hull 1: CountLeafs (x2)
+         0.018s  hull 1: MakeTreePortals
+         0.012s  hull 1: MakePortalsFromBuildportals
+         0.003s  hull 1: CalcTreeBounds
+         0.011s  hull 1: FillOutside
+         0.002s  hull 1: FillDetail
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.001s  hull 2: (start)
+         0.008s  hull 2: Brush_LoadEntity
+         0.001s  hull 2: CountBrushes
+         0.020s  hull 2: BrushBSP precise
+         0.009s  hull 2: CountLeafs (x2)
+         0.020s  hull 2: MakeTreePortals
+         0.014s  hull 2: MakePortalsFromBuildportals
+         0.005s  hull 2: CalcTreeBounds
+         0.008s  hull 2: FillOutside
+         0.003s  hull 2: FillDetail
+         0.003s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.013s  FinishBSPFile
+   BENCH status=done elapsed=0.463 phase=686 name="FinishBSPFile" count=0 max=0 pct=0.00 units=212320
+   reference qbsp: 2.250 1.729 1.561  median 1.729s
+         0.026s  LoadMapFile
+         0.009s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.049s  hull 0: BrushBSP auto
+         0.015s  hull 0: CountLeafs (x3)
+         0.034s  hull 0: MakeTreePortals (x3)
+         0.014s  hull 0: MakePortalsFromBuildportals (x3)
+         0.004s  hull 0: CalcTreeBounds (x3)
+         0.006s  hull 0: FillOutside (x2)
+         0.008s  hull 0: FillDetail (x2)
+         0.036s  hull 0: BrushBSP precise
+         0.003s  hull 0: MarkVisibleSides
+         0.010s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.022s  hull 0: WritePortalFile
+         0.012s  hull 0: TJunc
+         0.012s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 0 bmodels: CountBrushes (x57)
+         0.012s  hull 0 bmodels: BrushBSP fast (x57)
+         0.003s  hull 0 bmodels: CountLeafs (x171)
+         0.014s  hull 0 bmodels: MakeTreePortals (x114)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x114)
+         0.002s  hull 0 bmodels: CalcTreeBounds (x114)
+         0.001s  hull 0 bmodels: FillBrushEntity (x57)
+         0.011s  hull 0 bmodels: BrushBSP precise (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.002s  hull 0 bmodels: MakeFaces (x57)
+         0.001s  hull 0 bmodels: PruneNodes (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.000s  hull 1: (start)
+         0.010s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.038s  hull 1: ChopBrushes
+         0.213s  hull 1: BrushBSP fast
+         0.017s  hull 1: CountLeafs (x3)
+         0.102s  hull 1: MakeTreePortals (x2)
+         0.042s  hull 1: MakePortalsFromBuildportals (x2)
+         0.008s  hull 1: CalcTreeBounds (x2)
+         0.028s  hull 1: FillOutside (x2)
+         0.013s  hull 1: FillDetail (x2)
+         0.096s  hull 1: BrushBSP precise
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.002s  hull 1 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 1 bmodels: CountBrushes (x57)
+         0.001s  hull 1 bmodels: ChopBrushes (x57)
+         0.012s  hull 1 bmodels: BrushBSP fast (x57)
+         0.001s  hull 1 bmodels: CountLeafs (x57)
+         0.000s  hull 2: (start)
+         0.009s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.045s  hull 2: ChopBrushes
+         0.263s  hull 2: BrushBSP fast
+         0.020s  hull 2: CountLeafs (x3)
+         0.113s  hull 2: MakeTreePortals (x2)
+         0.046s  hull 2: MakePortalsFromBuildportals (x2)
+         0.010s  hull 2: CalcTreeBounds (x2)
+         0.028s  hull 2: FillOutside (x2)
+         0.013s  hull 2: FillDetail (x2)
+         0.124s  hull 2: BrushBSP precise
+         0.002s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.002s  hull 2 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 2 bmodels: CountBrushes (x57)
+         0.001s  hull 2 bmodels: ChopBrushes (x57)
+         0.010s  hull 2 bmodels: BrushBSP fast (x57)
+         0.001s  hull 2 bmodels: CountLeafs (x57)
+         0.000s  (after hull 2 bmodels)
+         0.015s  FinishBSPFile
+   BENCH status=done elapsed=1.606 phase=1727 name="FinishBSPFile" count=0 max=0 pct=0.00 units=954898
+   check: SAME
+     ok   entities: 1959 lines identical
+     ok   models: 58
+     ok   surfaces: 151 model/texture groups, 26010523 units^2
+     ok   hull 0 contents: 0 of 25700 random differ
+     ok   hull 1 contents: 0 of 25700 random differ
+     ok   hull 2 contents: 0 of 25700 random differ
+-- small / bigmove: 1 big brush (>= 512u) moved 8u
+     edit: move brush near (608 1712 -344) z-8
+   times: 0.670 0.518 0.520  median 0.520s  (server 0.493s)  reverts: 0.228 0.200 0.191
+   server phases (median repetition):
+         0.013s  (init)
+         0.023s  LoadMapFile
+         0.007s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.005s  hull 0: Brush_LoadEntity
+         0.001s  hull 0: CountBrushes
+         0.045s  hull 0: BrushBSP auto
+         0.014s  hull 0: CountLeafs (x3)
+         0.030s  hull 0: MakeTreePortals (x3)
+         0.009s  hull 0: MakePortalsFromBuildportals (x3)
+         0.013s  hull 0: CalcTreeBounds (x3)
+         0.005s  hull 0: FillOutside (x2)
+         0.006s  hull 0: FillDetail (x2)
+         0.033s  hull 0: BrushBSP precise
+         0.002s  hull 0: MarkVisibleSides
+         0.008s  hull 0: MakeFaces
+         0.000s  hull 0: PruneNodes
+         0.020s  hull 0: WritePortalFile
+         0.012s  hull 0: TJunc
+         0.011s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.001s  hull 0 bmodels: CountBrushes (x57)
+         0.006s  hull 0 bmodels: MakeTreePortals (x57)
+         0.000s  hull 0 bmodels: MakePortalsFromBuildportals (x57)
+         0.001s  hull 0 bmodels: CalcTreeBounds (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.000s  hull 0 bmodels: PruneNodes (x57)
+         0.002s  hull 0 bmodels: CountLeafs (x57)
+         0.002s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.001s  hull 1: (start)
+         0.009s  hull 1: Brush_LoadEntity
+         0.001s  hull 1: CountBrushes
+         0.021s  hull 1: BrushBSP precise
+         0.007s  hull 1: CountLeafs (x2)
+         0.018s  hull 1: MakeTreePortals
+         0.014s  hull 1: MakePortalsFromBuildportals
+         0.003s  hull 1: CalcTreeBounds
+         0.011s  hull 1: FillOutside
+         0.002s  hull 1: FillDetail
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.001s  hull 2: (start)
+         0.008s  hull 2: Brush_LoadEntity
+         0.001s  hull 2: CountBrushes
+         0.028s  hull 2: BrushBSP precise
+         0.009s  hull 2: CountLeafs (x2)
+         0.023s  hull 2: MakeTreePortals
+         0.015s  hull 2: MakePortalsFromBuildportals
+         0.004s  hull 2: CalcTreeBounds
+         0.010s  hull 2: FillOutside
+         0.003s  hull 2: FillDetail
+         0.002s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.012s  FinishBSPFile
+   BENCH status=done elapsed=0.480 phase=686 name="FinishBSPFile" count=0 max=0 pct=0.00 units=230987
+   reference qbsp: 2.063 1.562 1.566  median 1.566s
+         0.029s  LoadMapFile
+         0.007s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.054s  hull 0: BrushBSP auto
+         0.014s  hull 0: CountLeafs (x3)
+         0.031s  hull 0: MakeTreePortals (x3)
+         0.015s  hull 0: MakePortalsFromBuildportals (x3)
+         0.004s  hull 0: CalcTreeBounds (x3)
+         0.006s  hull 0: FillOutside (x2)
+         0.007s  hull 0: FillDetail (x2)
+         0.037s  hull 0: BrushBSP precise
+         0.002s  hull 0: MarkVisibleSides
+         0.008s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.021s  hull 0: WritePortalFile
+         0.011s  hull 0: TJunc
+         0.011s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 0 bmodels: CountBrushes (x57)
+         0.011s  hull 0 bmodels: BrushBSP fast (x57)
+         0.003s  hull 0 bmodels: CountLeafs (x171)
+         0.012s  hull 0 bmodels: MakeTreePortals (x114)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x114)
+         0.002s  hull 0 bmodels: CalcTreeBounds (x114)
+         0.001s  hull 0 bmodels: FillBrushEntity (x57)
+         0.011s  hull 0 bmodels: BrushBSP precise (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.000s  hull 0 bmodels: PruneNodes (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.000s  hull 1: (start)
+         0.009s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.036s  hull 1: ChopBrushes
+         0.201s  hull 1: BrushBSP fast
+         0.016s  hull 1: CountLeafs (x3)
+         0.100s  hull 1: MakeTreePortals (x2)
+         0.042s  hull 1: MakePortalsFromBuildportals (x2)
+         0.008s  hull 1: CalcTreeBounds (x2)
+         0.027s  hull 1: FillOutside (x2)
+         0.012s  hull 1: FillDetail (x2)
+         0.091s  hull 1: BrushBSP precise
+         0.001s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.002s  hull 1 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 1 bmodels: CountBrushes (x57)
+         0.001s  hull 1 bmodels: ChopBrushes (x57)
+         0.012s  hull 1 bmodels: BrushBSP fast (x57)
+         0.001s  hull 1 bmodels: CountLeafs (x57)
+         0.000s  hull 2: (start)
+         0.010s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.045s  hull 2: ChopBrushes
+         0.245s  hull 2: BrushBSP fast
+         0.020s  hull 2: CountLeafs (x3)
+         0.108s  hull 2: MakeTreePortals (x2)
+         0.047s  hull 2: MakePortalsFromBuildportals (x2)
+         0.010s  hull 2: CalcTreeBounds (x2)
+         0.027s  hull 2: FillOutside (x2)
+         0.015s  hull 2: FillDetail (x2)
+         0.122s  hull 2: BrushBSP precise
+         0.002s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.002s  hull 2 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 2 bmodels: CountBrushes (x57)
+         0.001s  hull 2 bmodels: ChopBrushes (x57)
+         0.011s  hull 2 bmodels: BrushBSP fast (x57)
+         0.001s  hull 2 bmodels: CountLeafs (x57)
+         0.000s  (after hull 2 bmodels)
+         0.015s  FinishBSPFile
+   BENCH status=done elapsed=1.552 phase=1727 name="FinishBSPFile" count=0 max=0 pct=0.00 units=956740
+   check: SAME
+     ok   entities: 1959 lines identical
+     ok   models: 58
+     ok   surfaces: 151 model/texture groups, 26010356 units^2
+     ok   hull 0 contents: 0 of 25700 random differ
+     ok   hull 1 contents: 0 of 25700 random differ
+     ok   hull 2 contents: 0 of 25700 random differ
+-- small / align: 1 brush's texture alignment shifted 16 texels
+     edit: shift texture alignment of brush TECH04_3,TECH08_1 by 16
+   times: 0.236 0.203 0.191  median 0.203s  (server 0.172s)  reverts: 0.188 0.200 0.198
+   server phases (median repetition):
+         0.003s  (init)
+         0.028s  LoadMapFile
+         0.006s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.003s  hull 0: CountBrushes
+         0.016s  hull 0: MakeTreePortals (x2)
+         0.005s  hull 0: MakePortalsFromBuildportals (x2)
+         0.002s  hull 0: CalcTreeBounds (x2)
+         0.002s  hull 0: FillOutside
+         0.002s  hull 0: FillDetail
+         0.002s  hull 0: MarkVisibleSides
+         0.007s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.020s  hull 0: WritePortalFile
+         0.013s  hull 0: CountLeafs
+         0.011s  hull 0: TJunc
+         0.011s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.001s  hull 0 bmodels: CountBrushes (x57)
+         0.006s  hull 0 bmodels: MakeTreePortals (x57)
+         0.000s  hull 0 bmodels: MakePortalsFromBuildportals (x57)
+         0.001s  hull 0 bmodels: CalcTreeBounds (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.000s  hull 0 bmodels: PruneNodes (x57)
+         0.002s  hull 0 bmodels: CountLeafs (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.003s  hull 1: (start)
+         0.000s  hull 1 bmodels: (start)
+         0.002s  hull 2: (start)
+         0.000s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.013s  FinishBSPFile
+   BENCH status=done elapsed=0.172 phase=655 name="FinishBSPFile" count=0 max=0 pct=0.00 units=55015
+   reference qbsp: 1.908 1.594 1.572  median 1.594s
+         0.027s  LoadMapFile
+         0.008s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.053s  hull 0: BrushBSP auto
+         0.015s  hull 0: CountLeafs (x3)
+         0.034s  hull 0: MakeTreePortals (x3)
+         0.013s  hull 0: MakePortalsFromBuildportals (x3)
+         0.004s  hull 0: CalcTreeBounds (x3)
+         0.006s  hull 0: FillOutside (x2)
+         0.008s  hull 0: FillDetail (x2)
+         0.036s  hull 0: BrushBSP precise
+         0.002s  hull 0: MarkVisibleSides
+         0.010s  hull 0: MakeFaces
+         0.000s  hull 0: PruneNodes
+         0.022s  hull 0: WritePortalFile
+         0.013s  hull 0: TJunc
+         0.012s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 0 bmodels: CountBrushes (x57)
+         0.011s  hull 0 bmodels: BrushBSP fast (x57)
+         0.003s  hull 0 bmodels: CountLeafs (x171)
+         0.012s  hull 0 bmodels: MakeTreePortals (x114)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x114)
+         0.002s  hull 0 bmodels: CalcTreeBounds (x114)
+         0.001s  hull 0 bmodels: FillBrushEntity (x57)
+         0.011s  hull 0 bmodels: BrushBSP precise (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.000s  hull 0 bmodels: PruneNodes (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.000s  hull 1: (start)
+         0.010s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.037s  hull 1: ChopBrushes
+         0.209s  hull 1: BrushBSP fast
+         0.017s  hull 1: CountLeafs (x3)
+         0.106s  hull 1: MakeTreePortals (x2)
+         0.041s  hull 1: MakePortalsFromBuildportals (x2)
+         0.009s  hull 1: CalcTreeBounds (x2)
+         0.027s  hull 1: FillOutside (x2)
+         0.012s  hull 1: FillDetail (x2)
+         0.094s  hull 1: BrushBSP precise
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.002s  hull 1 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 1 bmodels: CountBrushes (x57)
+         0.001s  hull 1 bmodels: ChopBrushes (x57)
+         0.011s  hull 1 bmodels: BrushBSP fast (x57)
+         0.001s  hull 1 bmodels: CountLeafs (x57)
+         0.000s  hull 2: (start)
+         0.010s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.045s  hull 2: ChopBrushes
+         0.245s  hull 2: BrushBSP fast
+         0.020s  hull 2: CountLeafs (x3)
+         0.112s  hull 2: MakeTreePortals (x2)
+         0.045s  hull 2: MakePortalsFromBuildportals (x2)
+         0.009s  hull 2: CalcTreeBounds (x2)
+         0.028s  hull 2: FillOutside (x2)
+         0.014s  hull 2: FillDetail (x2)
+         0.123s  hull 2: BrushBSP precise
+         0.002s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.002s  hull 2 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 2 bmodels: CountBrushes (x57)
+         0.001s  hull 2 bmodels: ChopBrushes (x57)
+         0.011s  hull 2 bmodels: BrushBSP fast (x57)
+         0.001s  hull 2 bmodels: CountLeafs (x57)
+         0.000s  (after hull 2 bmodels)
+         0.015s  FinishBSPFile
+   BENCH status=done elapsed=1.579 phase=1727 name="FinishBSPFile" count=0 max=0 pct=0.00 units=955524
+   check: SAME
+     ok   entities: 1959 lines identical
+     ok   models: 58
+     ok   surfaces: 151 model/texture groups, 26010356 units^2
+     ok   hull 0 contents: 0 of 25700 random differ
+     ok   hull 1 contents: 0 of 25700 random differ
+     ok   hull 2 contents: 0 of 25700 random differ
+-- small / add: 1 brush added
+     edit: add 16u box under light at (1224 1200 -504)
+   times: 0.531 0.511 0.503  median 0.511s  (server 0.483s)  reverts: 0.185 0.222 0.224
+   server phases (median repetition):
+         0.002s  (init)
+         0.029s  LoadMapFile
+         0.006s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.001s  hull 0: CountBrushes
+         0.052s  hull 0: BrushBSP auto
+         0.015s  hull 0: CountLeafs (x3)
+         0.031s  hull 0: MakeTreePortals (x3)
+         0.011s  hull 0: MakePortalsFromBuildportals (x3)
+         0.011s  hull 0: CalcTreeBounds (x3)
+         0.006s  hull 0: FillOutside (x2)
+         0.011s  hull 0: FillDetail (x2)
+         0.036s  hull 0: BrushBSP precise
+         0.002s  hull 0: MarkVisibleSides
+         0.008s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.020s  hull 0: WritePortalFile
+         0.011s  hull 0: TJunc
+         0.012s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.001s  hull 0 bmodels: CountBrushes (x57)
+         0.006s  hull 0 bmodels: MakeTreePortals (x57)
+         0.000s  hull 0 bmodels: MakePortalsFromBuildportals (x57)
+         0.001s  hull 0 bmodels: CalcTreeBounds (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.000s  hull 0 bmodels: PruneNodes (x57)
+         0.002s  hull 0 bmodels: CountLeafs (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.001s  hull 1: (start)
+         0.010s  hull 1: Brush_LoadEntity
+         0.001s  hull 1: CountBrushes
+         0.016s  hull 1: BrushBSP precise
+         0.007s  hull 1: CountLeafs (x2)
+         0.016s  hull 1: MakeTreePortals
+         0.015s  hull 1: MakePortalsFromBuildportals
+         0.003s  hull 1: CalcTreeBounds
+         0.010s  hull 1: FillOutside
+         0.003s  hull 1: FillDetail
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.001s  hull 2: (start)
+         0.009s  hull 2: Brush_LoadEntity
+         0.001s  hull 2: CountBrushes
+         0.024s  hull 2: BrushBSP precise
+         0.009s  hull 2: CountLeafs (x2)
+         0.021s  hull 2: MakeTreePortals
+         0.015s  hull 2: MakePortalsFromBuildportals
+         0.004s  hull 2: CalcTreeBounds
+         0.010s  hull 2: FillOutside
+         0.004s  hull 2: FillDetail
+         0.002s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.013s  FinishBSPFile
+   BENCH status=done elapsed=0.483 phase=686 name="FinishBSPFile" count=0 max=0 pct=0.00 units=218836
+   reference qbsp: 1.642 1.817 1.948  median 1.817s
+         0.027s  LoadMapFile
+         0.009s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.052s  hull 0: BrushBSP auto
+         0.015s  hull 0: CountLeafs (x3)
+         0.033s  hull 0: MakeTreePortals (x3)
+         0.013s  hull 0: MakePortalsFromBuildportals (x3)
+         0.003s  hull 0: CalcTreeBounds (x3)
+         0.006s  hull 0: FillOutside (x2)
+         0.008s  hull 0: FillDetail (x2)
+         0.036s  hull 0: BrushBSP precise
+         0.002s  hull 0: MarkVisibleSides
+         0.009s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.021s  hull 0: WritePortalFile
+         0.013s  hull 0: TJunc
+         0.012s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 0 bmodels: CountBrushes (x57)
+         0.012s  hull 0 bmodels: BrushBSP fast (x57)
+         0.003s  hull 0 bmodels: CountLeafs (x171)
+         0.013s  hull 0 bmodels: MakeTreePortals (x114)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x114)
+         0.002s  hull 0 bmodels: CalcTreeBounds (x114)
+         0.001s  hull 0 bmodels: FillBrushEntity (x57)
+         0.011s  hull 0 bmodels: BrushBSP precise (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.001s  hull 0 bmodels: PruneNodes (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.002s  hull 0 bmodels: EmitFaces (x57)
+         0.000s  hull 1: (start)
+         0.010s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.036s  hull 1: ChopBrushes
+         0.208s  hull 1: BrushBSP fast
+         0.018s  hull 1: CountLeafs (x3)
+         0.111s  hull 1: MakeTreePortals (x2)
+         0.044s  hull 1: MakePortalsFromBuildportals (x2)
+         0.010s  hull 1: CalcTreeBounds (x2)
+         0.029s  hull 1: FillOutside (x2)
+         0.014s  hull 1: FillDetail (x2)
+         0.112s  hull 1: BrushBSP precise
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.002s  hull 1 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 1 bmodels: CountBrushes (x57)
+         0.001s  hull 1 bmodels: ChopBrushes (x57)
+         0.014s  hull 1 bmodels: BrushBSP fast (x57)
+         0.001s  hull 1 bmodels: CountLeafs (x57)
+         0.000s  hull 2: (start)
+         0.011s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.054s  hull 2: ChopBrushes
+         0.317s  hull 2: BrushBSP fast
+         0.023s  hull 2: CountLeafs (x3)
+         0.154s  hull 2: MakeTreePortals (x2)
+         0.055s  hull 2: MakePortalsFromBuildportals (x2)
+         0.012s  hull 2: CalcTreeBounds (x2)
+         0.031s  hull 2: FillOutside (x2)
+         0.018s  hull 2: FillDetail (x2)
+         0.159s  hull 2: BrushBSP precise
+         0.003s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.002s  hull 2 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 2 bmodels: CountBrushes (x57)
+         0.001s  hull 2 bmodels: ChopBrushes (x57)
+         0.013s  hull 2 bmodels: BrushBSP fast (x57)
+         0.001s  hull 2 bmodels: CountLeafs (x57)
+         0.000s  (after hull 2 bmodels)
+         0.017s  FinishBSPFile
+   BENCH status=done elapsed=1.800 phase=1727 name="FinishBSPFile" count=0 max=0 pct=0.00 units=956708
+   check: SAME
+     ok   entities: 1959 lines identical
+     ok   models: 58
+     ok   surfaces: 151 model/texture groups, 26011380 units^2
+     ok   hull 0 contents: 0 of 25700 random differ
+     ok   hull 1 contents: 0 of 25700 random differ
+     ok   hull 2 contents: 0 of 25700 random differ
+-- small / geotex: 3 moved + 3 retextured + 1 added
+     edit: move brush near (544 2856 64) z-8
+     edit: move brush near (928 1688 -448) y+8
+     edit: move brush near (1296 1248 -200) z+8
+     edit: retexture brush UWALL1_2 -> TWALL1_2
+     edit: retexture brush TECH11_2 -> TWALL2_5
+     edit: retexture brush TECH08_1 -> ECOP1_4
+     edit: add 16u box under light at (752 2000 -88)
+   times: 0.599 0.694 0.684  median 0.684s  (server 0.656s)  reverts: 0.183 0.236 0.216
+   server phases (median repetition):
+         0.002s  (init)
+         0.027s  LoadMapFile
+         0.007s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.001s  hull 0: CountBrushes
+         0.057s  hull 0: BrushBSP auto
+         0.017s  hull 0: CountLeafs (x3)
+         0.037s  hull 0: MakeTreePortals (x3)
+         0.011s  hull 0: MakePortalsFromBuildportals (x3)
+         0.013s  hull 0: CalcTreeBounds (x3)
+         0.007s  hull 0: FillOutside (x2)
+         0.007s  hull 0: FillDetail (x2)
+         0.042s  hull 0: BrushBSP precise
+         0.003s  hull 0: MarkVisibleSides
+         0.010s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.024s  hull 0: WritePortalFile
+         0.015s  hull 0: TJunc
+         0.013s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.001s  hull 0 bmodels: CountBrushes (x57)
+         0.007s  hull 0 bmodels: MakeTreePortals (x57)
+         0.000s  hull 0 bmodels: MakePortalsFromBuildportals (x57)
+         0.001s  hull 0 bmodels: CalcTreeBounds (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.001s  hull 0 bmodels: PruneNodes (x57)
+         0.003s  hull 0 bmodels: CountLeafs (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.001s  hull 1: (start)
+         0.011s  hull 1: Brush_LoadEntity
+         0.001s  hull 1: CountBrushes
+         0.050s  hull 1: BrushBSP precise
+         0.009s  hull 1: CountLeafs (x2)
+         0.030s  hull 1: MakeTreePortals
+         0.014s  hull 1: MakePortalsFromBuildportals
+         0.005s  hull 1: CalcTreeBounds
+         0.012s  hull 1: FillOutside
+         0.003s  hull 1: FillDetail
+         0.002s  hull 1: PruneNodes
+         0.001s  hull 1 bmodels: (start)
+         0.001s  hull 2: (start)
+         0.010s  hull 2: Brush_LoadEntity
+         0.001s  hull 2: CountBrushes
+         0.077s  hull 2: BrushBSP precise
+         0.011s  hull 2: CountLeafs (x2)
+         0.041s  hull 2: MakeTreePortals
+         0.018s  hull 2: MakePortalsFromBuildportals
+         0.005s  hull 2: CalcTreeBounds
+         0.012s  hull 2: FillOutside
+         0.004s  hull 2: FillDetail
+         0.003s  hull 2: PruneNodes
+         0.001s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.016s  FinishBSPFile
+   BENCH status=done elapsed=0.656 phase=686 name="FinishBSPFile" count=0 max=0 pct=0.00 units=284281
+   reference qbsp: 1.695 2.006 1.947  median 1.947s
+         0.030s  LoadMapFile
+         0.008s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.058s  hull 0: BrushBSP auto
+         0.017s  hull 0: CountLeafs (x3)
+         0.040s  hull 0: MakeTreePortals (x3)
+         0.016s  hull 0: MakePortalsFromBuildportals (x3)
+         0.004s  hull 0: CalcTreeBounds (x3)
+         0.008s  hull 0: FillOutside (x2)
+         0.008s  hull 0: FillDetail (x2)
+         0.043s  hull 0: BrushBSP precise
+         0.003s  hull 0: MarkVisibleSides
+         0.011s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.025s  hull 0: WritePortalFile
+         0.015s  hull 0: TJunc
+         0.015s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 0 bmodels: CountBrushes (x57)
+         0.013s  hull 0 bmodels: BrushBSP fast (x57)
+         0.003s  hull 0 bmodels: CountLeafs (x171)
+         0.014s  hull 0 bmodels: MakeTreePortals (x114)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x114)
+         0.002s  hull 0 bmodels: CalcTreeBounds (x114)
+         0.001s  hull 0 bmodels: FillBrushEntity (x57)
+         0.013s  hull 0 bmodels: BrushBSP precise (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.002s  hull 0 bmodels: MakeFaces (x57)
+         0.001s  hull 0 bmodels: PruneNodes (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.002s  hull 0 bmodels: EmitFaces (x57)
+         0.000s  hull 1: (start)
+         0.011s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.044s  hull 1: ChopBrushes
+         0.260s  hull 1: BrushBSP fast
+         0.018s  hull 1: CountLeafs (x3)
+         0.123s  hull 1: MakeTreePortals (x2)
+         0.048s  hull 1: MakePortalsFromBuildportals (x2)
+         0.011s  hull 1: CalcTreeBounds (x2)
+         0.033s  hull 1: FillOutside (x2)
+         0.016s  hull 1: FillDetail (x2)
+         0.107s  hull 1: BrushBSP precise
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.002s  hull 1 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 1 bmodels: CountBrushes (x57)
+         0.001s  hull 1 bmodels: ChopBrushes (x57)
+         0.014s  hull 1 bmodels: BrushBSP fast (x57)
+         0.001s  hull 1 bmodels: CountLeafs (x57)
+         0.000s  hull 2: (start)
+         0.010s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.053s  hull 2: ChopBrushes
+         0.319s  hull 2: BrushBSP fast
+         0.024s  hull 2: CountLeafs (x3)
+         0.153s  hull 2: MakeTreePortals (x2)
+         0.055s  hull 2: MakePortalsFromBuildportals (x2)
+         0.012s  hull 2: CalcTreeBounds (x2)
+         0.033s  hull 2: FillOutside (x2)
+         0.016s  hull 2: FillDetail (x2)
+         0.161s  hull 2: BrushBSP precise
+         0.003s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.002s  hull 2 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 2 bmodels: CountBrushes (x57)
+         0.001s  hull 2 bmodels: ChopBrushes (x57)
+         0.014s  hull 2 bmodels: BrushBSP fast (x57)
+         0.001s  hull 2 bmodels: CountLeafs (x57)
+         0.000s  (after hull 2 bmodels)
+         0.018s  FinishBSPFile
+   BENCH status=done elapsed=1.930 phase=1727 name="FinishBSPFile" count=0 max=0 pct=0.00 units=958669
+   check: SAME
+     ok   entities: 1959 lines identical
+     ok   models: 58
+     ok   surfaces: 152 model/texture groups, 26015220 units^2
+     ok   hull 0 contents: 0 of 25700 random differ
+     ok   hull 1 contents: 0 of 25700 random differ
+     ok   hull 2 contents: 0 of 25700 random differ
+-- small / many: 2% moved + 2% retextured + 10 added + 10 entities
+     edit: move brush near (112 2768 128) x-8
+     edit: move brush near (768 2376 -384) y-8
+     edit: move brush near (1016 2096 -528) x+8
+     edit: move brush near (512 -32 104) z+8
+     edit: move brush near (448 72 160) y+8
+     edit: move brush near (1304 1120 -144) x+8
+     edit: retexture brush TECH04_1,TWALL1_1,TWALL1_2 -> SLIPLITE
+     edit: retexture brush TECH08_1 -> BASEBUTN3
+     edit: retexture brush ECOP1_4,TECH04_3,TWALL5_1 -> SFLOOR4_5
+     edit: retexture brush TLIGHT08,TWALL3_1 -> COMP1_1
+     edit: retexture brush TECH04_1 -> TWALL1_1
+     edit: retexture brush UWALL1_2 -> TECH01_1
+     edit: retexture brush TECH08_1 -> SLIPTOPSD
+     edit: retexture brush TWALL2_6 -> TECH04_2
+     edit: retexture brush TECH04_3 -> SLIPBOTSD
+     edit: retexture brush ECOP1_6 -> SWITCH_1
+     edit: retexture brush TECH01_6 -> TWALL1_2
+     edit: retexture brush TECH08_1,TLIGHT02 -> TWALL5_1
+     edit: retexture brush TECH11_2 -> TECH04_2
+     edit: retexture brush TLIGHT08,TWALL3_1 -> TECH10_1
+     ... 28 more edits
+   times: 0.711 0.924 0.679  median 0.711s  (server 0.683s)  reverts: 0.227 0.207 0.216
+   server phases (median repetition):
+         0.002s  (init)
+         0.025s  LoadMapFile
+         0.006s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.003s  hull 0: Brush_LoadEntity
+         0.001s  hull 0: CountBrushes
+         0.053s  hull 0: BrushBSP auto
+         0.015s  hull 0: CountLeafs (x3)
+         0.030s  hull 0: MakeTreePortals (x3)
+         0.013s  hull 0: MakePortalsFromBuildportals (x3)
+         0.011s  hull 0: CalcTreeBounds (x3)
+         0.015s  hull 0: FillOutside (x2)
+         0.011s  hull 0: FillDetail (x2)
+         0.037s  hull 0: BrushBSP precise
+         0.002s  hull 0: MarkVisibleSides
+         0.007s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.021s  hull 0: WritePortalFile
+         0.013s  hull 0: TJunc
+         0.012s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.001s  hull 0 bmodels: CountBrushes (x57)
+         0.006s  hull 0 bmodels: MakeTreePortals (x57)
+         0.000s  hull 0 bmodels: MakePortalsFromBuildportals (x57)
+         0.001s  hull 0 bmodels: CalcTreeBounds (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.000s  hull 0 bmodels: PruneNodes (x57)
+         0.002s  hull 0 bmodels: CountLeafs (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.001s  hull 1: (start)
+         0.009s  hull 1: Brush_LoadEntity
+         0.001s  hull 1: CountBrushes
+         0.078s  hull 1: BrushBSP precise
+         0.007s  hull 1: CountLeafs (x2)
+         0.039s  hull 1: MakeTreePortals
+         0.015s  hull 1: MakePortalsFromBuildportals
+         0.005s  hull 1: CalcTreeBounds
+         0.009s  hull 1: FillOutside
+         0.004s  hull 1: FillDetail
+         0.003s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.001s  hull 2: (start)
+         0.008s  hull 2: Brush_LoadEntity
+         0.001s  hull 2: CountBrushes
+         0.109s  hull 2: BrushBSP precise
+         0.008s  hull 2: CountLeafs (x2)
+         0.039s  hull 2: MakeTreePortals
+         0.018s  hull 2: MakePortalsFromBuildportals
+         0.004s  hull 2: CalcTreeBounds
+         0.011s  hull 2: FillOutside
+         0.004s  hull 2: FillDetail
+         0.002s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.013s  FinishBSPFile
+   BENCH status=done elapsed=0.683 phase=686 name="FinishBSPFile" count=0 max=0 pct=0.00 units=373732
+   reference qbsp: 1.602 1.680 1.599  median 1.602s
+         0.028s  LoadMapFile
+         0.008s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.004s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.054s  hull 0: BrushBSP auto
+         0.015s  hull 0: CountLeafs (x3)
+         0.034s  hull 0: MakeTreePortals (x3)
+         0.013s  hull 0: MakePortalsFromBuildportals (x3)
+         0.004s  hull 0: CalcTreeBounds (x3)
+         0.007s  hull 0: FillOutside (x2)
+         0.008s  hull 0: FillDetail (x2)
+         0.037s  hull 0: BrushBSP precise
+         0.003s  hull 0: MarkVisibleSides
+         0.009s  hull 0: MakeFaces
+         0.000s  hull 0: PruneNodes
+         0.021s  hull 0: WritePortalFile
+         0.013s  hull 0: TJunc
+         0.013s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.001s  hull 0 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 0 bmodels: CountBrushes (x57)
+         0.011s  hull 0 bmodels: BrushBSP fast (x57)
+         0.003s  hull 0 bmodels: CountLeafs (x171)
+         0.012s  hull 0 bmodels: MakeTreePortals (x114)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x114)
+         0.002s  hull 0 bmodels: CalcTreeBounds (x114)
+         0.001s  hull 0 bmodels: FillBrushEntity (x57)
+         0.010s  hull 0 bmodels: BrushBSP precise (x57)
+         0.000s  hull 0 bmodels: MarkVisibleSides (x57)
+         0.001s  hull 0 bmodels: MakeFaces (x57)
+         0.001s  hull 0 bmodels: PruneNodes (x57)
+         0.003s  hull 0 bmodels: TJunc (x57)
+         0.001s  hull 0 bmodels: EmitFaces (x57)
+         0.000s  hull 1: (start)
+         0.009s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.036s  hull 1: ChopBrushes
+         0.211s  hull 1: BrushBSP fast
+         0.017s  hull 1: CountLeafs (x3)
+         0.105s  hull 1: MakeTreePortals (x2)
+         0.043s  hull 1: MakePortalsFromBuildportals (x2)
+         0.009s  hull 1: CalcTreeBounds (x2)
+         0.026s  hull 1: FillOutside (x2)
+         0.014s  hull 1: FillDetail (x2)
+         0.095s  hull 1: BrushBSP precise
+         0.002s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.002s  hull 1 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 1 bmodels: CountBrushes (x57)
+         0.001s  hull 1 bmodels: ChopBrushes (x57)
+         0.010s  hull 1 bmodels: BrushBSP fast (x57)
+         0.001s  hull 1 bmodels: CountLeafs (x57)
+         0.000s  hull 2: (start)
+         0.009s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.043s  hull 2: ChopBrushes
+         0.251s  hull 2: BrushBSP fast
+         0.018s  hull 2: CountLeafs (x3)
+         0.109s  hull 2: MakeTreePortals (x2)
+         0.045s  hull 2: MakePortalsFromBuildportals (x2)
+         0.010s  hull 2: CalcTreeBounds (x2)
+         0.029s  hull 2: FillOutside (x2)
+         0.013s  hull 2: FillDetail (x2)
+         0.126s  hull 2: BrushBSP precise
+         0.002s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.002s  hull 2 bmodels: Brush_LoadEntity (x57)
+         0.000s  hull 2 bmodels: CountBrushes (x57)
+         0.001s  hull 2 bmodels: ChopBrushes (x57)
+         0.010s  hull 2 bmodels: BrushBSP fast (x57)
+         0.001s  hull 2 bmodels: CountLeafs (x57)
+         0.000s  (after hull 2 bmodels)
+         0.014s  FinishBSPFile
+   BENCH status=done elapsed=1.583 phase=1727 name="FinishBSPFile" count=0 max=0 pct=0.00 units=973890
+   check: SAME
+     ok   entities: 1959 lines identical
+     ok   models: 58
+     ok   surfaces: 152 model/texture groups, 26035030 units^2
+     ok   hull 0 contents: 0 of 25700 random differ
+     ok   hull 1 contents: 0 of 25700 random differ
+     ok   hull 2 contents: 0 of 25700 random differ
+-- e3m4: initial full compile 9.167s
+-- e3m4 / nochange: recompile without changes
+   times: 0.049 0.040 0.040  median 0.040s  reverts: 0.048 0.041 0.051
+   server phases (median repetition):
+   reference qbsp: 8.828 8.849 9.426  median 8.849s
+         0.115s  LoadMapFile
+         0.046s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.013s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.160s  hull 0: BrushBSP auto
+         0.051s  hull 0: CountLeafs (x3)
+         0.119s  hull 0: MakeTreePortals (x3)
+         0.052s  hull 0: MakePortalsFromBuildportals (x3)
+         0.010s  hull 0: CalcTreeBounds (x3)
+         0.048s  hull 0: FillOutside (x2)
+         0.050s  hull 0: FillDetail (x2)
+         0.132s  hull 0: BrushBSP precise
+         0.011s  hull 0: MarkVisibleSides
+         0.036s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.034s  hull 0: WritePortalFile
+         0.048s  hull 0: TJunc
+         0.042s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.006s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 0 bmodels: CountBrushes (x263)
+         0.057s  hull 0 bmodels: BrushBSP fast (x263)
+         0.015s  hull 0 bmodels: CountLeafs (x789)
+         0.061s  hull 0 bmodels: MakeTreePortals (x526)
+         0.004s  hull 0 bmodels: MakePortalsFromBuildportals (x526)
+         0.010s  hull 0 bmodels: CalcTreeBounds (x526)
+         0.004s  hull 0 bmodels: FillBrushEntity (x263)
+         0.058s  hull 0 bmodels: BrushBSP precise (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.007s  hull 0 bmodels: MakeFaces (x263)
+         0.003s  hull 0 bmodels: PruneNodes (x263)
+         0.013s  hull 0 bmodels: TJunc (x263)
+         0.007s  hull 0 bmodels: EmitFaces (x263)
+         0.000s  hull 1: (start)
+         0.087s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.260s  hull 1: ChopBrushes
+         1.221s  hull 1: BrushBSP fast
+         0.087s  hull 1: CountLeafs (x3)
+         0.526s  hull 1: MakeTreePortals (x2)
+         0.197s  hull 1: MakePortalsFromBuildportals (x2)
+         0.044s  hull 1: CalcTreeBounds (x2)
+         0.137s  hull 1: FillOutside (x2)
+         0.057s  hull 1: FillDetail (x2)
+         0.795s  hull 1: BrushBSP precise
+         0.008s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.012s  hull 1 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 1 bmodels: CountBrushes (x263)
+         0.007s  hull 1 bmodels: ChopBrushes (x263)
+         0.065s  hull 1 bmodels: BrushBSP fast (x263)
+         0.004s  hull 1 bmodels: CountLeafs (x263)
+         0.000s  hull 2: (start)
+         0.084s  hull 2: Brush_LoadEntity
+         0.001s  hull 2: CountBrushes
+         0.291s  hull 2: ChopBrushes
+         1.492s  hull 2: BrushBSP fast
+         0.099s  hull 2: CountLeafs (x3)
+         0.556s  hull 2: MakeTreePortals (x2)
+         0.218s  hull 2: MakePortalsFromBuildportals (x2)
+         0.051s  hull 2: CalcTreeBounds (x2)
+         0.140s  hull 2: FillOutside (x2)
+         0.071s  hull 2: FillDetail (x2)
+         0.908s  hull 2: BrushBSP precise
+         0.010s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.013s  hull 2 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 2 bmodels: CountBrushes (x263)
+         0.009s  hull 2 bmodels: ChopBrushes (x263)
+         0.074s  hull 2 bmodels: BrushBSP fast (x263)
+         0.004s  hull 2 bmodels: CountLeafs (x263)
+         0.001s  (after hull 2 bmodels)
+         0.064s  FinishBSPFile
+   BENCH status=done elapsed=8.812 phase=7701 name="FinishBSPFile" count=0 max=0 pct=0.00 units=4673494
+   check: SAME
+     ok   entities: 5870 lines identical
+     ok   models: 264
+     ok   surfaces: 391 model/texture groups, 67446522 units^2
+     ok   hull 0 contents: 0 of 46300 random differ
+     ok   hull 1 contents: 0 of 46300 random differ
+     ok   hull 2 contents: 0 of 46300 random differ
+-- e3m4 / entity: 1 point entity changed (moved 16u, light value)
+     edit: light_flame_small_yellow at (128 1393 688) moved x+16
+   times: 0.761 0.844 0.937  median 0.844s  (server 0.797s)  reverts: 0.749 0.752 0.796
+   server phases (median repetition):
+         0.007s  (init)
+         0.122s  LoadMapFile
+         0.048s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.014s  hull 0: Brush_LoadEntity
+         0.014s  hull 0: CountBrushes
+         0.075s  hull 0: MakeTreePortals (x2)
+         0.025s  hull 0: MakePortalsFromBuildportals (x2)
+         0.009s  hull 0: CalcTreeBounds (x2)
+         0.020s  hull 0: FillOutside
+         0.017s  hull 0: FillDetail
+         0.010s  hull 0: MarkVisibleSides
+         0.035s  hull 0: MakeFaces
+         0.002s  hull 0: PruneNodes
+         0.036s  hull 0: WritePortalFile
+         0.045s  hull 0: CountLeafs
+         0.062s  hull 0: TJunc
+         0.045s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.006s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.005s  hull 0 bmodels: CountBrushes (x263)
+         0.035s  hull 0 bmodels: MakeTreePortals (x263)
+         0.002s  hull 0 bmodels: MakePortalsFromBuildportals (x263)
+         0.006s  hull 0 bmodels: CalcTreeBounds (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.008s  hull 0 bmodels: MakeFaces (x263)
+         0.003s  hull 0 bmodels: PruneNodes (x263)
+         0.013s  hull 0 bmodels: CountLeafs (x263)
+         0.015s  hull 0 bmodels: TJunc (x263)
+         0.007s  hull 0 bmodels: EmitFaces (x263)
+         0.025s  hull 1: (start)
+         0.005s  hull 1 bmodels: (start)
+         0.017s  hull 2: (start)
+         0.004s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.057s  FinishBSPFile
+   BENCH status=done elapsed=0.797 phase=2921 name="FinishBSPFile" count=0 max=0 pct=0.00 units=198356
+   reference qbsp: 10.018 9.423 8.775  median 9.423s
+         0.136s  LoadMapFile
+         0.051s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.014s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.197s  hull 0: BrushBSP auto
+         0.061s  hull 0: CountLeafs (x3)
+         0.162s  hull 0: MakeTreePortals (x3)
+         0.065s  hull 0: MakePortalsFromBuildportals (x3)
+         0.016s  hull 0: CalcTreeBounds (x3)
+         0.056s  hull 0: FillOutside (x2)
+         0.058s  hull 0: FillDetail (x2)
+         0.168s  hull 0: BrushBSP precise
+         0.012s  hull 0: MarkVisibleSides
+         0.041s  hull 0: MakeFaces
+         0.002s  hull 0: PruneNodes
+         0.058s  hull 0: WritePortalFile
+         0.055s  hull 0: TJunc
+         0.051s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.007s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 0 bmodels: CountBrushes (x263)
+         0.072s  hull 0 bmodels: BrushBSP fast (x263)
+         0.019s  hull 0 bmodels: CountLeafs (x789)
+         0.075s  hull 0 bmodels: MakeTreePortals (x526)
+         0.005s  hull 0 bmodels: MakePortalsFromBuildportals (x526)
+         0.013s  hull 0 bmodels: CalcTreeBounds (x526)
+         0.005s  hull 0 bmodels: FillBrushEntity (x263)
+         0.073s  hull 0 bmodels: BrushBSP precise (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.009s  hull 0 bmodels: MakeFaces (x263)
+         0.003s  hull 0 bmodels: PruneNodes (x263)
+         0.016s  hull 0 bmodels: TJunc (x263)
+         0.009s  hull 0 bmodels: EmitFaces (x263)
+         0.000s  hull 1: (start)
+         0.099s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.243s  hull 1: ChopBrushes
+         1.631s  hull 1: BrushBSP fast
+         0.092s  hull 1: CountLeafs (x3)
+         0.558s  hull 1: MakeTreePortals (x2)
+         0.195s  hull 1: MakePortalsFromBuildportals (x2)
+         0.044s  hull 1: CalcTreeBounds (x2)
+         0.135s  hull 1: FillOutside (x2)
+         0.060s  hull 1: FillDetail (x2)
+         0.743s  hull 1: BrushBSP precise
+         0.007s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.011s  hull 1 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 1 bmodels: CountBrushes (x263)
+         0.007s  hull 1 bmodels: ChopBrushes (x263)
+         0.062s  hull 1 bmodels: BrushBSP fast (x263)
+         0.004s  hull 1 bmodels: CountLeafs (x263)
+         0.000s  hull 2: (start)
+         0.081s  hull 2: Brush_LoadEntity
+         0.001s  hull 2: CountBrushes
+         0.285s  hull 2: ChopBrushes
+         1.433s  hull 2: BrushBSP fast
+         0.095s  hull 2: CountLeafs (x3)
+         0.543s  hull 2: MakeTreePortals (x2)
+         0.216s  hull 2: MakePortalsFromBuildportals (x2)
+         0.050s  hull 2: CalcTreeBounds (x2)
+         0.142s  hull 2: FillOutside (x2)
+         0.071s  hull 2: FillDetail (x2)
+         0.912s  hull 2: BrushBSP precise
+         0.011s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.011s  hull 2 bmodels: Brush_LoadEntity (x263)
+         0.000s  hull 2 bmodels: CountBrushes (x263)
+         0.008s  hull 2 bmodels: ChopBrushes (x263)
+         0.063s  hull 2 bmodels: BrushBSP fast (x263)
+         0.003s  hull 2 bmodels: CountLeafs (x263)
+         0.001s  (after hull 2 bmodels)
+         0.055s  FinishBSPFile
+   BENCH status=done elapsed=9.387 phase=7701 name="FinishBSPFile" count=0 max=0 pct=0.00 units=4673494
+   check: SAME
+     ok   entities: 5870 lines identical
+     ok   models: 264
+     ok   surfaces: 391 model/texture groups, 67446522 units^2
+     ok   hull 0 contents: 0 of 46300 random differ
+     ok   hull 1 contents: 0 of 46300 random differ
+     ok   hull 2 contents: 0 of 46300 random differ
+-- e3m4 / texture: 1 brush retextured
+     edit: retexture brush grk_ebrick22 -> med_csl_flr1_1
+   times: 0.745 0.767 0.753  median 0.753s  (server 0.704s)  reverts: 0.747 0.713 0.712
+   server phases (median repetition):
+         0.005s  (init)
+         0.113s  LoadMapFile
+         0.044s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.013s  hull 0: Brush_LoadEntity
+         0.012s  hull 0: CountBrushes
+         0.067s  hull 0: MakeTreePortals (x2)
+         0.023s  hull 0: MakePortalsFromBuildportals (x2)
+         0.006s  hull 0: CalcTreeBounds (x2)
+         0.017s  hull 0: FillOutside
+         0.016s  hull 0: FillDetail
+         0.010s  hull 0: MarkVisibleSides
+         0.031s  hull 0: MakeFaces
+         0.002s  hull 0: PruneNodes
+         0.034s  hull 0: WritePortalFile
+         0.042s  hull 0: CountLeafs
+         0.050s  hull 0: TJunc
+         0.037s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.006s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.004s  hull 0 bmodels: CountBrushes (x263)
+         0.030s  hull 0 bmodels: MakeTreePortals (x263)
+         0.002s  hull 0 bmodels: MakePortalsFromBuildportals (x263)
+         0.005s  hull 0 bmodels: CalcTreeBounds (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.007s  hull 0 bmodels: MakeFaces (x263)
+         0.003s  hull 0 bmodels: PruneNodes (x263)
+         0.012s  hull 0 bmodels: CountLeafs (x263)
+         0.013s  hull 0 bmodels: TJunc (x263)
+         0.006s  hull 0 bmodels: EmitFaces (x263)
+         0.022s  hull 1: (start)
+         0.004s  hull 1 bmodels: (start)
+         0.015s  hull 2: (start)
+         0.004s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.051s  FinishBSPFile
+   BENCH status=done elapsed=0.704 phase=2921 name="FinishBSPFile" count=0 max=0 pct=0.00 units=198356
+   reference qbsp: 8.761 8.821 8.673  median 8.761s
+         0.120s  LoadMapFile
+         0.047s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.014s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.151s  hull 0: BrushBSP auto
+         0.054s  hull 0: CountLeafs (x3)
+         0.126s  hull 0: MakeTreePortals (x3)
+         0.053s  hull 0: MakePortalsFromBuildportals (x3)
+         0.010s  hull 0: CalcTreeBounds (x3)
+         0.046s  hull 0: FillOutside (x2)
+         0.056s  hull 0: FillDetail (x2)
+         0.130s  hull 0: BrushBSP precise
+         0.012s  hull 0: MarkVisibleSides
+         0.035s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.036s  hull 0: WritePortalFile
+         0.046s  hull 0: TJunc
+         0.040s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.006s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 0 bmodels: CountBrushes (x263)
+         0.054s  hull 0 bmodels: BrushBSP fast (x263)
+         0.014s  hull 0 bmodels: CountLeafs (x789)
+         0.058s  hull 0 bmodels: MakeTreePortals (x526)
+         0.004s  hull 0 bmodels: MakePortalsFromBuildportals (x526)
+         0.010s  hull 0 bmodels: CalcTreeBounds (x526)
+         0.004s  hull 0 bmodels: FillBrushEntity (x263)
+         0.056s  hull 0 bmodels: BrushBSP precise (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.006s  hull 0 bmodels: MakeFaces (x263)
+         0.003s  hull 0 bmodels: PruneNodes (x263)
+         0.012s  hull 0 bmodels: TJunc (x263)
+         0.007s  hull 0 bmodels: EmitFaces (x263)
+         0.000s  hull 1: (start)
+         0.082s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.224s  hull 1: ChopBrushes
+         1.273s  hull 1: BrushBSP fast
+         0.087s  hull 1: CountLeafs (x3)
+         0.522s  hull 1: MakeTreePortals (x2)
+         0.193s  hull 1: MakePortalsFromBuildportals (x2)
+         0.043s  hull 1: CalcTreeBounds (x2)
+         0.136s  hull 1: FillOutside (x2)
+         0.056s  hull 1: FillDetail (x2)
+         0.779s  hull 1: BrushBSP precise
+         0.007s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.012s  hull 1 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 1 bmodels: CountBrushes (x263)
+         0.007s  hull 1 bmodels: ChopBrushes (x263)
+         0.061s  hull 1 bmodels: BrushBSP fast (x263)
+         0.003s  hull 1 bmodels: CountLeafs (x263)
+         0.000s  hull 2: (start)
+         0.085s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.304s  hull 2: ChopBrushes
+         1.493s  hull 2: BrushBSP fast
+         0.095s  hull 2: CountLeafs (x3)
+         0.537s  hull 2: MakeTreePortals (x2)
+         0.214s  hull 2: MakePortalsFromBuildportals (x2)
+         0.044s  hull 2: CalcTreeBounds (x2)
+         0.131s  hull 2: FillOutside (x2)
+         0.067s  hull 2: FillDetail (x2)
+         0.898s  hull 2: BrushBSP precise
+         0.010s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.011s  hull 2 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 2 bmodels: CountBrushes (x263)
+         0.007s  hull 2 bmodels: ChopBrushes (x263)
+         0.062s  hull 2 bmodels: BrushBSP fast (x263)
+         0.003s  hull 2 bmodels: CountLeafs (x263)
+         0.001s  (after hull 2 bmodels)
+         0.055s  FinishBSPFile
+   BENCH status=done elapsed=8.718 phase=7701 name="FinishBSPFile" count=0 max=0 pct=0.00 units=4673494
+   check: SAME
+     ok   entities: 5870 lines identical
+     ok   models: 264
+     ok   surfaces: 391 model/texture groups, 67446522 units^2
+     ok   hull 0 contents: 0 of 46300 random differ
+     ok   hull 1 contents: 0 of 46300 random differ
+     ok   hull 2 contents: 0 of 46300 random differ
+-- e3m4 / move: 1 small brush moved 8u
+     edit: move brush near (-766 -918 364) y-8
+   times: 2.217 2.193 2.131  median 2.193s  (server 2.150s)  reverts: 0.729 0.782 0.735
+   server phases (median repetition):
+         0.005s  (init)
+         0.111s  LoadMapFile
+         0.043s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.011s  hull 0: Brush_LoadEntity
+         0.004s  hull 0: CountBrushes
+         0.166s  hull 0: BrushBSP auto
+         0.052s  hull 0: CountLeafs (x3)
+         0.114s  hull 0: MakeTreePortals (x3)
+         0.039s  hull 0: MakePortalsFromBuildportals (x3)
+         0.051s  hull 0: CalcTreeBounds (x3)
+         0.042s  hull 0: FillOutside (x2)
+         0.047s  hull 0: FillDetail (x2)
+         0.130s  hull 0: BrushBSP precise
+         0.011s  hull 0: MarkVisibleSides
+         0.033s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.035s  hull 0: WritePortalFile
+         0.048s  hull 0: TJunc
+         0.039s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.005s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.004s  hull 0 bmodels: CountBrushes (x263)
+         0.026s  hull 0 bmodels: MakeTreePortals (x263)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x263)
+         0.004s  hull 0 bmodels: CalcTreeBounds (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.006s  hull 0 bmodels: MakeFaces (x263)
+         0.002s  hull 0 bmodels: PruneNodes (x263)
+         0.010s  hull 0 bmodels: CountLeafs (x263)
+         0.012s  hull 0 bmodels: TJunc (x263)
+         0.005s  hull 0 bmodels: EmitFaces (x263)
+         0.003s  hull 1: (start)
+         0.080s  hull 1: Brush_LoadEntity
+         0.003s  hull 1: CountBrushes
+         0.114s  hull 1: BrushBSP precise
+         0.049s  hull 1: CountLeafs (x2)
+         0.082s  hull 1: MakeTreePortals
+         0.057s  hull 1: MakePortalsFromBuildportals
+         0.016s  hull 1: CalcTreeBounds
+         0.053s  hull 1: FillOutside
+         0.014s  hull 1: FillDetail
+         0.009s  hull 1: PruneNodes
+         0.005s  hull 1 bmodels: (start)
+         0.002s  hull 2: (start)
+         0.075s  hull 2: Brush_LoadEntity
+         0.003s  hull 2: CountBrushes
+         0.152s  hull 2: BrushBSP precise
+         0.052s  hull 2: CountLeafs (x2)
+         0.087s  hull 2: MakeTreePortals
+         0.069s  hull 2: MakePortalsFromBuildportals
+         0.021s  hull 2: CalcTreeBounds
+         0.053s  hull 2: FillOutside
+         0.020s  hull 2: FillDetail
+         0.014s  hull 2: PruneNodes
+         0.004s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.054s  FinishBSPFile
+   BENCH status=done elapsed=2.150 phase=2952 name="FinishBSPFile" count=0 max=0 pct=0.00 units=920437
+   reference qbsp: 8.626 8.723 8.557  median 8.626s
+         0.116s  LoadMapFile
+         0.044s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.013s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.159s  hull 0: BrushBSP auto
+         0.051s  hull 0: CountLeafs (x3)
+         0.121s  hull 0: MakeTreePortals (x3)
+         0.052s  hull 0: MakePortalsFromBuildportals (x3)
+         0.010s  hull 0: CalcTreeBounds (x3)
+         0.048s  hull 0: FillOutside (x2)
+         0.050s  hull 0: FillDetail (x2)
+         0.131s  hull 0: BrushBSP precise
+         0.009s  hull 0: MarkVisibleSides
+         0.034s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.035s  hull 0: WritePortalFile
+         0.053s  hull 0: TJunc
+         0.042s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.006s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 0 bmodels: CountBrushes (x263)
+         0.056s  hull 0 bmodels: BrushBSP fast (x263)
+         0.015s  hull 0 bmodels: CountLeafs (x789)
+         0.061s  hull 0 bmodels: MakeTreePortals (x526)
+         0.004s  hull 0 bmodels: MakePortalsFromBuildportals (x526)
+         0.010s  hull 0 bmodels: CalcTreeBounds (x526)
+         0.004s  hull 0 bmodels: FillBrushEntity (x263)
+         0.058s  hull 0 bmodels: BrushBSP precise (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.007s  hull 0 bmodels: MakeFaces (x263)
+         0.003s  hull 0 bmodels: PruneNodes (x263)
+         0.013s  hull 0 bmodels: TJunc (x263)
+         0.007s  hull 0 bmodels: EmitFaces (x263)
+         0.000s  hull 1: (start)
+         0.078s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.218s  hull 1: ChopBrushes
+         1.196s  hull 1: BrushBSP fast
+         0.085s  hull 1: CountLeafs (x3)
+         0.517s  hull 1: MakeTreePortals (x2)
+         0.192s  hull 1: MakePortalsFromBuildportals (x2)
+         0.042s  hull 1: CalcTreeBounds (x2)
+         0.136s  hull 1: FillOutside (x2)
+         0.055s  hull 1: FillDetail (x2)
+         0.790s  hull 1: BrushBSP precise
+         0.008s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.012s  hull 1 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 1 bmodels: CountBrushes (x263)
+         0.007s  hull 1 bmodels: ChopBrushes (x263)
+         0.062s  hull 1 bmodels: BrushBSP fast (x263)
+         0.003s  hull 1 bmodels: CountLeafs (x263)
+         0.000s  hull 2: (start)
+         0.080s  hull 2: Brush_LoadEntity
+         0.001s  hull 2: CountBrushes
+         0.287s  hull 2: ChopBrushes
+         1.422s  hull 2: BrushBSP fast
+         0.094s  hull 2: CountLeafs (x3)
+         0.541s  hull 2: MakeTreePortals (x2)
+         0.222s  hull 2: MakePortalsFromBuildportals (x2)
+         0.047s  hull 2: CalcTreeBounds (x2)
+         0.132s  hull 2: FillOutside (x2)
+         0.070s  hull 2: FillDetail (x2)
+         0.918s  hull 2: BrushBSP precise
+         0.009s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.011s  hull 2 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 2 bmodels: CountBrushes (x263)
+         0.008s  hull 2 bmodels: ChopBrushes (x263)
+         0.064s  hull 2 bmodels: BrushBSP fast (x263)
+         0.003s  hull 2 bmodels: CountLeafs (x263)
+         0.001s  (after hull 2 bmodels)
+         0.060s  FinishBSPFile
+   BENCH status=done elapsed=8.588 phase=7701 name="FinishBSPFile" count=0 max=0 pct=0.00 units=4676373
+   check: SAME
+     ok   entities: 5870 lines identical
+     ok   models: 264
+     ok   surfaces: 391 model/texture groups, 67446590 units^2
+     ok   hull 0 contents: 0 of 46300 random differ
+     ok   hull 1 contents: 0 of 46300 random differ
+     ok   hull 2 contents: 0 of 46300 random differ
+-- e3m4 / bigmove: 1 big brush (>= 512u) moved 8u
+     edit: move brush near (-2668 1392 808) z-8
+   times: 2.130 2.157 2.113  median 2.130s  (server 2.090s)  reverts: 0.749 0.726 0.861
+   server phases (median repetition):
+         0.009s  (init)
+         0.114s  LoadMapFile
+         0.044s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.012s  hull 0: Brush_LoadEntity
+         0.003s  hull 0: CountBrushes
+         0.161s  hull 0: BrushBSP auto
+         0.053s  hull 0: CountLeafs (x3)
+         0.130s  hull 0: MakeTreePortals (x3)
+         0.057s  hull 0: MakePortalsFromBuildportals (x3)
+         0.064s  hull 0: CalcTreeBounds (x3)
+         0.051s  hull 0: FillOutside (x2)
+         0.046s  hull 0: FillDetail (x2)
+         0.135s  hull 0: BrushBSP precise
+         0.011s  hull 0: MarkVisibleSides
+         0.031s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.034s  hull 0: WritePortalFile
+         0.048s  hull 0: TJunc
+         0.038s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.005s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.004s  hull 0 bmodels: CountBrushes (x263)
+         0.026s  hull 0 bmodels: MakeTreePortals (x263)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x263)
+         0.004s  hull 0 bmodels: CalcTreeBounds (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.005s  hull 0 bmodels: MakeFaces (x263)
+         0.002s  hull 0 bmodels: PruneNodes (x263)
+         0.010s  hull 0 bmodels: CountLeafs (x263)
+         0.011s  hull 0 bmodels: TJunc (x263)
+         0.005s  hull 0 bmodels: EmitFaces (x263)
+         0.003s  hull 1: (start)
+         0.076s  hull 1: Brush_LoadEntity
+         0.004s  hull 1: CountBrushes
+         0.081s  hull 1: BrushBSP precise
+         0.042s  hull 1: CountLeafs (x2)
+         0.058s  hull 1: MakeTreePortals
+         0.059s  hull 1: MakePortalsFromBuildportals
+         0.015s  hull 1: CalcTreeBounds
+         0.046s  hull 1: FillOutside
+         0.015s  hull 1: FillDetail
+         0.009s  hull 1: PruneNodes
+         0.004s  hull 1 bmodels: (start)
+         0.003s  hull 2: (start)
+         0.076s  hull 2: Brush_LoadEntity
+         0.003s  hull 2: CountBrushes
+         0.122s  hull 2: BrushBSP precise
+         0.050s  hull 2: CountLeafs (x2)
+         0.071s  hull 2: MakeTreePortals
+         0.072s  hull 2: MakePortalsFromBuildportals
+         0.019s  hull 2: CalcTreeBounds
+         0.054s  hull 2: FillOutside
+         0.021s  hull 2: FillDetail
+         0.013s  hull 2: PruneNodes
+         0.005s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.051s  FinishBSPFile
+   BENCH status=done elapsed=2.090 phase=2952 name="FinishBSPFile" count=0 max=0 pct=0.00 units=880817
+   reference qbsp: 8.789 8.871 10.005  median 8.871s
+         0.119s  LoadMapFile
+         0.048s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.013s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.163s  hull 0: BrushBSP auto
+         0.054s  hull 0: CountLeafs (x3)
+         0.136s  hull 0: MakeTreePortals (x3)
+         0.056s  hull 0: MakePortalsFromBuildportals (x3)
+         0.012s  hull 0: CalcTreeBounds (x3)
+         0.052s  hull 0: FillOutside (x2)
+         0.056s  hull 0: FillDetail (x2)
+         0.150s  hull 0: BrushBSP precise
+         0.011s  hull 0: MarkVisibleSides
+         0.035s  hull 0: MakeFaces
+         0.002s  hull 0: PruneNodes
+         0.039s  hull 0: WritePortalFile
+         0.049s  hull 0: TJunc
+         0.043s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.007s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 0 bmodels: CountBrushes (x263)
+         0.067s  hull 0 bmodels: BrushBSP fast (x263)
+         0.017s  hull 0 bmodels: CountLeafs (x789)
+         0.071s  hull 0 bmodels: MakeTreePortals (x526)
+         0.004s  hull 0 bmodels: MakePortalsFromBuildportals (x526)
+         0.011s  hull 0 bmodels: CalcTreeBounds (x526)
+         0.005s  hull 0 bmodels: FillBrushEntity (x263)
+         0.066s  hull 0 bmodels: BrushBSP precise (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.008s  hull 0 bmodels: MakeFaces (x263)
+         0.003s  hull 0 bmodels: PruneNodes (x263)
+         0.019s  hull 0 bmodels: TJunc (x263)
+         0.008s  hull 0 bmodels: EmitFaces (x263)
+         0.000s  hull 1: (start)
+         0.083s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.219s  hull 1: ChopBrushes
+         1.158s  hull 1: BrushBSP fast
+         0.083s  hull 1: CountLeafs (x3)
+         0.496s  hull 1: MakeTreePortals (x2)
+         0.192s  hull 1: MakePortalsFromBuildportals (x2)
+         0.045s  hull 1: CalcTreeBounds (x2)
+         0.135s  hull 1: FillOutside (x2)
+         0.055s  hull 1: FillDetail (x2)
+         0.745s  hull 1: BrushBSP precise
+         0.007s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.012s  hull 1 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 1 bmodels: CountBrushes (x263)
+         0.007s  hull 1 bmodels: ChopBrushes (x263)
+         0.064s  hull 1 bmodels: BrushBSP fast (x263)
+         0.004s  hull 1 bmodels: CountLeafs (x263)
+         0.000s  hull 2: (start)
+         0.082s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.274s  hull 2: ChopBrushes
+         1.590s  hull 2: BrushBSP fast
+         0.106s  hull 2: CountLeafs (x3)
+         0.608s  hull 2: MakeTreePortals (x2)
+         0.217s  hull 2: MakePortalsFromBuildportals (x2)
+         0.049s  hull 2: CalcTreeBounds (x2)
+         0.142s  hull 2: FillOutside (x2)
+         0.069s  hull 2: FillDetail (x2)
+         0.898s  hull 2: BrushBSP precise
+         0.012s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.013s  hull 2 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 2 bmodels: CountBrushes (x263)
+         0.009s  hull 2 bmodels: ChopBrushes (x263)
+         0.070s  hull 2 bmodels: BrushBSP fast (x263)
+         0.004s  hull 2 bmodels: CountLeafs (x263)
+         0.001s  (after hull 2 bmodels)
+         0.055s  FinishBSPFile
+   BENCH status=done elapsed=8.833 phase=7701 name="FinishBSPFile" count=0 max=0 pct=0.00 units=4674448
+   check: SAME
+     ok   entities: 5870 lines identical
+     ok   models: 264
+     ok   surfaces: 391 model/texture groups, 67453001 units^2
+     ok   hull 0 contents: 0 of 46300 random differ
+     ok   hull 1 contents: 0 of 46300 random differ
+     ok   hull 2 contents: 0 of 46300 random differ
+-- e3m4 / align: 1 brush's texture alignment shifted 16 texels
+     edit: shift texture alignment of brush grk_ebrick23 by 16
+   times: 0.744 0.704 0.825  median 0.744s  (server 0.703s)  reverts: 0.752 0.774 0.750
+   server phases (median repetition):
+         0.006s  (init)
+         0.119s  LoadMapFile
+         0.047s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.014s  hull 0: Brush_LoadEntity
+         0.013s  hull 0: CountBrushes
+         0.060s  hull 0: MakeTreePortals (x2)
+         0.025s  hull 0: MakePortalsFromBuildportals (x2)
+         0.006s  hull 0: CalcTreeBounds (x2)
+         0.017s  hull 0: FillOutside
+         0.017s  hull 0: FillDetail
+         0.009s  hull 0: MarkVisibleSides
+         0.028s  hull 0: MakeFaces
+         0.002s  hull 0: PruneNodes
+         0.031s  hull 0: WritePortalFile
+         0.042s  hull 0: CountLeafs
+         0.048s  hull 0: TJunc
+         0.037s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.005s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.004s  hull 0 bmodels: CountBrushes (x263)
+         0.029s  hull 0 bmodels: MakeTreePortals (x263)
+         0.002s  hull 0 bmodels: MakePortalsFromBuildportals (x263)
+         0.005s  hull 0 bmodels: CalcTreeBounds (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.006s  hull 0 bmodels: MakeFaces (x263)
+         0.002s  hull 0 bmodels: PruneNodes (x263)
+         0.011s  hull 0 bmodels: CountLeafs (x263)
+         0.012s  hull 0 bmodels: TJunc (x263)
+         0.006s  hull 0 bmodels: EmitFaces (x263)
+         0.022s  hull 1: (start)
+         0.005s  hull 1 bmodels: (start)
+         0.015s  hull 2: (start)
+         0.005s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.053s  FinishBSPFile
+   BENCH status=done elapsed=0.703 phase=2921 name="FinishBSPFile" count=0 max=0 pct=0.00 units=198356
+   reference qbsp: 8.680 8.742 8.558  median 8.680s
+         0.124s  LoadMapFile
+         0.048s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.015s  hull 0: Brush_LoadEntity
+         0.001s  hull 0: CountBrushes
+         0.163s  hull 0: BrushBSP auto
+         0.054s  hull 0: CountLeafs (x3)
+         0.123s  hull 0: MakeTreePortals (x3)
+         0.053s  hull 0: MakePortalsFromBuildportals (x3)
+         0.011s  hull 0: CalcTreeBounds (x3)
+         0.046s  hull 0: FillOutside (x2)
+         0.052s  hull 0: FillDetail (x2)
+         0.132s  hull 0: BrushBSP precise
+         0.011s  hull 0: MarkVisibleSides
+         0.034s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.036s  hull 0: WritePortalFile
+         0.048s  hull 0: TJunc
+         0.043s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.006s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 0 bmodels: CountBrushes (x263)
+         0.056s  hull 0 bmodels: BrushBSP fast (x263)
+         0.015s  hull 0 bmodels: CountLeafs (x789)
+         0.060s  hull 0 bmodels: MakeTreePortals (x526)
+         0.004s  hull 0 bmodels: MakePortalsFromBuildportals (x526)
+         0.010s  hull 0 bmodels: CalcTreeBounds (x526)
+         0.004s  hull 0 bmodels: FillBrushEntity (x263)
+         0.056s  hull 0 bmodels: BrushBSP precise (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.006s  hull 0 bmodels: MakeFaces (x263)
+         0.003s  hull 0 bmodels: PruneNodes (x263)
+         0.012s  hull 0 bmodels: TJunc (x263)
+         0.007s  hull 0 bmodels: EmitFaces (x263)
+         0.000s  hull 1: (start)
+         0.083s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.228s  hull 1: ChopBrushes
+         1.209s  hull 1: BrushBSP fast
+         0.088s  hull 1: CountLeafs (x3)
+         0.540s  hull 1: MakeTreePortals (x2)
+         0.197s  hull 1: MakePortalsFromBuildportals (x2)
+         0.041s  hull 1: CalcTreeBounds (x2)
+         0.136s  hull 1: FillOutside (x2)
+         0.059s  hull 1: FillDetail (x2)
+         0.756s  hull 1: BrushBSP precise
+         0.006s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.011s  hull 1 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 1 bmodels: CountBrushes (x263)
+         0.007s  hull 1 bmodels: ChopBrushes (x263)
+         0.061s  hull 1 bmodels: BrushBSP fast (x263)
+         0.003s  hull 1 bmodels: CountLeafs (x263)
+         0.000s  hull 2: (start)
+         0.082s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.286s  hull 2: ChopBrushes
+         1.422s  hull 2: BrushBSP fast
+         0.100s  hull 2: CountLeafs (x3)
+         0.544s  hull 2: MakeTreePortals (x2)
+         0.221s  hull 2: MakePortalsFromBuildportals (x2)
+         0.046s  hull 2: CalcTreeBounds (x2)
+         0.135s  hull 2: FillOutside (x2)
+         0.066s  hull 2: FillDetail (x2)
+         0.926s  hull 2: BrushBSP precise
+         0.009s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.011s  hull 2 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 2 bmodels: CountBrushes (x263)
+         0.008s  hull 2 bmodels: ChopBrushes (x263)
+         0.063s  hull 2 bmodels: BrushBSP fast (x263)
+         0.004s  hull 2 bmodels: CountLeafs (x263)
+         0.001s  (after hull 2 bmodels)
+         0.055s  FinishBSPFile
+   BENCH status=done elapsed=8.643 phase=7701 name="FinishBSPFile" count=0 max=0 pct=0.00 units=4673494
+   check: SAME
+     ok   entities: 5870 lines identical
+     ok   models: 264
+     ok   surfaces: 391 model/texture groups, 67446522 units^2
+     ok   hull 0 contents: 0 of 46300 random differ
+     ok   hull 1 contents: 0 of 46300 random differ
+     ok   hull 2 contents: 0 of 46300 random differ
+-- e3m4 / add: 1 brush added
+     edit: add 16u box under light_flame_small_yellow at (386 194 332)
+   times: 2.161 2.077 2.075  median 2.077s  (server 2.034s)  reverts: 0.756 0.715 0.742
+   server phases (median repetition):
+         0.005s  (init)
+         0.111s  LoadMapFile
+         0.042s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.013s  hull 0: Brush_LoadEntity
+         0.003s  hull 0: CountBrushes
+         0.156s  hull 0: BrushBSP auto
+         0.055s  hull 0: CountLeafs (x3)
+         0.123s  hull 0: MakeTreePortals (x3)
+         0.044s  hull 0: MakePortalsFromBuildportals (x3)
+         0.052s  hull 0: CalcTreeBounds (x3)
+         0.045s  hull 0: FillOutside (x2)
+         0.050s  hull 0: FillDetail (x2)
+         0.137s  hull 0: BrushBSP precise
+         0.012s  hull 0: MarkVisibleSides
+         0.033s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.034s  hull 0: WritePortalFile
+         0.049s  hull 0: TJunc
+         0.040s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.005s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.004s  hull 0 bmodels: CountBrushes (x263)
+         0.028s  hull 0 bmodels: MakeTreePortals (x263)
+         0.002s  hull 0 bmodels: MakePortalsFromBuildportals (x263)
+         0.004s  hull 0 bmodels: CalcTreeBounds (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.006s  hull 0 bmodels: MakeFaces (x263)
+         0.002s  hull 0 bmodels: PruneNodes (x263)
+         0.010s  hull 0 bmodels: CountLeafs (x263)
+         0.011s  hull 0 bmodels: TJunc (x263)
+         0.005s  hull 0 bmodels: EmitFaces (x263)
+         0.003s  hull 1: (start)
+         0.079s  hull 1: Brush_LoadEntity
+         0.005s  hull 1: CountBrushes
+         0.079s  hull 1: BrushBSP precise
+         0.042s  hull 1: CountLeafs (x2)
+         0.055s  hull 1: MakeTreePortals
+         0.060s  hull 1: MakePortalsFromBuildportals
+         0.016s  hull 1: CalcTreeBounds
+         0.050s  hull 1: FillOutside
+         0.013s  hull 1: FillDetail
+         0.010s  hull 1: PruneNodes
+         0.004s  hull 1 bmodels: (start)
+         0.003s  hull 2: (start)
+         0.075s  hull 2: Brush_LoadEntity
+         0.003s  hull 2: CountBrushes
+         0.108s  hull 2: BrushBSP precise
+         0.051s  hull 2: CountLeafs (x2)
+         0.066s  hull 2: MakeTreePortals
+         0.067s  hull 2: MakePortalsFromBuildportals
+         0.020s  hull 2: CalcTreeBounds
+         0.054s  hull 2: FillOutside
+         0.019s  hull 2: FillDetail
+         0.014s  hull 2: PruneNodes
+         0.004s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.052s  FinishBSPFile
+   BENCH status=done elapsed=2.033 phase=2952 name="FinishBSPFile" count=0 max=0 pct=0.00 units=864625
+   reference qbsp: 10.631 8.496 8.690  median 8.690s
+         0.121s  LoadMapFile
+         0.048s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.014s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.156s  hull 0: BrushBSP auto
+         0.055s  hull 0: CountLeafs (x3)
+         0.120s  hull 0: MakeTreePortals (x3)
+         0.054s  hull 0: MakePortalsFromBuildportals (x3)
+         0.011s  hull 0: CalcTreeBounds (x3)
+         0.052s  hull 0: FillOutside (x2)
+         0.051s  hull 0: FillDetail (x2)
+         0.133s  hull 0: BrushBSP precise
+         0.013s  hull 0: MarkVisibleSides
+         0.034s  hull 0: MakeFaces
+         0.002s  hull 0: PruneNodes
+         0.035s  hull 0: WritePortalFile
+         0.047s  hull 0: TJunc
+         0.041s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.006s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 0 bmodels: CountBrushes (x263)
+         0.057s  hull 0 bmodels: BrushBSP fast (x263)
+         0.015s  hull 0 bmodels: CountLeafs (x789)
+         0.060s  hull 0 bmodels: MakeTreePortals (x526)
+         0.004s  hull 0 bmodels: MakePortalsFromBuildportals (x526)
+         0.010s  hull 0 bmodels: CalcTreeBounds (x526)
+         0.004s  hull 0 bmodels: FillBrushEntity (x263)
+         0.056s  hull 0 bmodels: BrushBSP precise (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.007s  hull 0 bmodels: MakeFaces (x263)
+         0.003s  hull 0 bmodels: PruneNodes (x263)
+         0.013s  hull 0 bmodels: TJunc (x263)
+         0.007s  hull 0 bmodels: EmitFaces (x263)
+         0.000s  hull 1: (start)
+         0.081s  hull 1: Brush_LoadEntity
+         0.000s  hull 1: CountBrushes
+         0.230s  hull 1: ChopBrushes
+         1.228s  hull 1: BrushBSP fast
+         0.084s  hull 1: CountLeafs (x3)
+         0.521s  hull 1: MakeTreePortals (x2)
+         0.197s  hull 1: MakePortalsFromBuildportals (x2)
+         0.041s  hull 1: CalcTreeBounds (x2)
+         0.137s  hull 1: FillOutside (x2)
+         0.055s  hull 1: FillDetail (x2)
+         0.770s  hull 1: BrushBSP precise
+         0.006s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.011s  hull 1 bmodels: Brush_LoadEntity (x263)
+         0.000s  hull 1 bmodels: CountBrushes (x263)
+         0.006s  hull 1 bmodels: ChopBrushes (x263)
+         0.060s  hull 1 bmodels: BrushBSP fast (x263)
+         0.004s  hull 1 bmodels: CountLeafs (x263)
+         0.000s  hull 2: (start)
+         0.085s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.295s  hull 2: ChopBrushes
+         1.440s  hull 2: BrushBSP fast
+         0.099s  hull 2: CountLeafs (x3)
+         0.533s  hull 2: MakeTreePortals (x2)
+         0.224s  hull 2: MakePortalsFromBuildportals (x2)
+         0.045s  hull 2: CalcTreeBounds (x2)
+         0.135s  hull 2: FillOutside (x2)
+         0.069s  hull 2: FillDetail (x2)
+         0.912s  hull 2: BrushBSP precise
+         0.009s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.012s  hull 2 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 2 bmodels: CountBrushes (x263)
+         0.009s  hull 2 bmodels: ChopBrushes (x263)
+         0.066s  hull 2 bmodels: BrushBSP fast (x263)
+         0.004s  hull 2 bmodels: CountLeafs (x263)
+         0.001s  (after hull 2 bmodels)
+         0.054s  FinishBSPFile
+   BENCH status=done elapsed=8.654 phase=7701 name="FinishBSPFile" count=0 max=0 pct=0.00 units=4675758
+   check: SAME
+     ok   entities: 5870 lines identical
+     ok   models: 264
+     ok   surfaces: 391 model/texture groups, 67447954 units^2
+     ok   hull 0 contents: 0 of 46300 random differ
+     ok   hull 1 contents: 0 of 46300 random differ
+     ok   hull 2 contents: 0 of 46300 random differ
+-- e3m4 / geotex: 3 moved + 3 retextured + 1 added
+     edit: move brush near (-252 -608 72) z-8
+     edit: move brush near (-1672 1565 1568) y+8
+     edit: move brush near (-3296 1793 1118) z+8
+     edit: retexture brush grk_ebrick22 -> grk_flr4_1
+     edit: retexture brush grk_ebrick22,grk_flr4_5,grk_flr5_4 -> grk_det1
+     edit: retexture brush grk_ebrick10 -> grk_flr4_5
+     edit: add 16u box under light at (-376 352 102)
+   times: 2.352 2.309 2.664  median 2.352s  (server 2.313s)  reverts: 0.728 0.840 0.738
+   server phases (median repetition):
+         0.011s  (init)
+         0.115s  LoadMapFile
+         0.044s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.013s  hull 0: Brush_LoadEntity
+         0.003s  hull 0: CountBrushes
+         0.156s  hull 0: BrushBSP auto
+         0.071s  hull 0: CountLeafs (x3)
+         0.120s  hull 0: MakeTreePortals (x3)
+         0.046s  hull 0: MakePortalsFromBuildportals (x3)
+         0.054s  hull 0: CalcTreeBounds (x3)
+         0.045s  hull 0: FillOutside (x2)
+         0.049s  hull 0: FillDetail (x2)
+         0.141s  hull 0: BrushBSP precise
+         0.012s  hull 0: MarkVisibleSides
+         0.034s  hull 0: MakeFaces
+         0.002s  hull 0: PruneNodes
+         0.035s  hull 0: WritePortalFile
+         0.061s  hull 0: TJunc
+         0.041s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.006s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.004s  hull 0 bmodels: CountBrushes (x263)
+         0.031s  hull 0 bmodels: MakeTreePortals (x263)
+         0.002s  hull 0 bmodels: MakePortalsFromBuildportals (x263)
+         0.005s  hull 0 bmodels: CalcTreeBounds (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.006s  hull 0 bmodels: MakeFaces (x263)
+         0.002s  hull 0 bmodels: PruneNodes (x263)
+         0.011s  hull 0 bmodels: CountLeafs (x263)
+         0.013s  hull 0 bmodels: TJunc (x263)
+         0.006s  hull 0 bmodels: EmitFaces (x263)
+         0.003s  hull 1: (start)
+         0.080s  hull 1: Brush_LoadEntity
+         0.003s  hull 1: CountBrushes
+         0.149s  hull 1: BrushBSP precise
+         0.041s  hull 1: CountLeafs (x2)
+         0.075s  hull 1: MakeTreePortals
+         0.060s  hull 1: MakePortalsFromBuildportals
+         0.017s  hull 1: CalcTreeBounds
+         0.047s  hull 1: FillOutside
+         0.014s  hull 1: FillDetail
+         0.009s  hull 1: PruneNodes
+         0.004s  hull 1 bmodels: (start)
+         0.002s  hull 2: (start)
+         0.076s  hull 2: Brush_LoadEntity
+         0.003s  hull 2: CountBrushes
+         0.205s  hull 2: BrushBSP precise
+         0.049s  hull 2: CountLeafs (x2)
+         0.095s  hull 2: MakeTreePortals
+         0.073s  hull 2: MakePortalsFromBuildportals
+         0.021s  hull 2: CalcTreeBounds
+         0.053s  hull 2: FillOutside
+         0.021s  hull 2: FillDetail
+         0.012s  hull 2: PruneNodes
+         0.004s  hull 2 bmodels: (start)
+         0.000s  (after hull 2 bmodels)
+         0.052s  FinishBSPFile
+   BENCH status=done elapsed=2.313 phase=2952 name="FinishBSPFile" count=0 max=0 pct=0.00 units=975083
+   reference qbsp: 8.684 10.066 9.179  median 9.179s
+         0.130s  LoadMapFile
+         0.052s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.015s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.201s  hull 0: BrushBSP auto
+         0.063s  hull 0: CountLeafs (x3)
+         0.169s  hull 0: MakeTreePortals (x3)
+         0.068s  hull 0: MakePortalsFromBuildportals (x3)
+         0.012s  hull 0: CalcTreeBounds (x3)
+         0.055s  hull 0: FillOutside (x2)
+         0.058s  hull 0: FillDetail (x2)
+         0.178s  hull 0: BrushBSP precise
+         0.013s  hull 0: MarkVisibleSides
+         0.046s  hull 0: MakeFaces
+         0.002s  hull 0: PruneNodes
+         0.045s  hull 0: WritePortalFile
+         0.066s  hull 0: TJunc
+         0.056s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.007s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 0 bmodels: CountBrushes (x263)
+         0.076s  hull 0 bmodels: BrushBSP fast (x263)
+         0.020s  hull 0 bmodels: CountLeafs (x789)
+         0.083s  hull 0 bmodels: MakeTreePortals (x526)
+         0.005s  hull 0 bmodels: MakePortalsFromBuildportals (x526)
+         0.014s  hull 0 bmodels: CalcTreeBounds (x526)
+         0.007s  hull 0 bmodels: FillBrushEntity (x263)
+         0.078s  hull 0 bmodels: BrushBSP precise (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.009s  hull 0 bmodels: MakeFaces (x263)
+         0.004s  hull 0 bmodels: PruneNodes (x263)
+         0.018s  hull 0 bmodels: TJunc (x263)
+         0.010s  hull 0 bmodels: EmitFaces (x263)
+         0.000s  hull 1: (start)
+         0.126s  hull 1: Brush_LoadEntity
+         0.001s  hull 1: CountBrushes
+         0.270s  hull 1: ChopBrushes
+         1.292s  hull 1: BrushBSP fast
+         0.089s  hull 1: CountLeafs (x3)
+         0.521s  hull 1: MakeTreePortals (x2)
+         0.209s  hull 1: MakePortalsFromBuildportals (x2)
+         0.044s  hull 1: CalcTreeBounds (x2)
+         0.139s  hull 1: FillOutside (x2)
+         0.059s  hull 1: FillDetail (x2)
+         0.784s  hull 1: BrushBSP precise
+         0.007s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.011s  hull 1 bmodels: Brush_LoadEntity (x263)
+         0.000s  hull 1 bmodels: CountBrushes (x263)
+         0.006s  hull 1 bmodels: ChopBrushes (x263)
+         0.060s  hull 1 bmodels: BrushBSP fast (x263)
+         0.003s  hull 1 bmodels: CountLeafs (x263)
+         0.000s  hull 2: (start)
+         0.087s  hull 2: Brush_LoadEntity
+         0.001s  hull 2: CountBrushes
+         0.306s  hull 2: ChopBrushes
+         1.425s  hull 2: BrushBSP fast
+         0.094s  hull 2: CountLeafs (x3)
+         0.529s  hull 2: MakeTreePortals (x2)
+         0.226s  hull 2: MakePortalsFromBuildportals (x2)
+         0.043s  hull 2: CalcTreeBounds (x2)
+         0.132s  hull 2: FillOutside (x2)
+         0.067s  hull 2: FillDetail (x2)
+         0.897s  hull 2: BrushBSP precise
+         0.009s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.011s  hull 2 bmodels: Brush_LoadEntity (x263)
+         0.000s  hull 2 bmodels: CountBrushes (x263)
+         0.008s  hull 2 bmodels: ChopBrushes (x263)
+         0.064s  hull 2 bmodels: BrushBSP fast (x263)
+         0.004s  hull 2 bmodels: CountLeafs (x263)
+         0.001s  (after hull 2 bmodels)
+         0.055s  FinishBSPFile
+   BENCH status=done elapsed=9.144 phase=7701 name="FinishBSPFile" count=0 max=0 pct=0.00 units=4679536
+   check: SAME
+     ok   entities: 5870 lines identical
+     ok   models: 264
+     ok   surfaces: 391 model/texture groups, 67447168 units^2
+     ok   hull 0 contents: 0 of 46300 random differ
+     ok   hull 1 contents: 0 of 46300 random differ
+     ok   hull 2 contents: 0 of 46300 random differ
+-- e3m4 / many: 2% moved + 2% retextured + 10 added + 10 entities
+     edit: move brush near (-1768 1515 1568) y+8
+     edit: move brush near (559 496 1400) x-8
+     edit: move brush near (-656 -556 -40) z+8
+     edit: move brush near (-1669 84 1578) y-8
+     edit: move brush near (1216 2064 296) z-8
+     edit: move brush near (2235 2065 624) y-8
+     edit: move brush near (-656 -556 160) z-8
+     edit: move brush near (-1172 1687 744) z-8
+     edit: move brush near (16 -160 328) x-8
+     edit: move brush near (1420 2130 572) y+8
+     edit: move brush near (-2128 2120 736) y+8
+     edit: move brush near (2785 664 572) y-8
+     edit: move brush near (-1169 2084 752) y+8
+     edit: move brush near (584 771 224) y-8
+     edit: move brush near (-2992 1814 816) y+8
+     edit: move brush near (-272 72 80) y+8
+     edit: move brush near (0 264 356) z-8
+     edit: move brush near (-1550.3636363636408 1608 912) x+8
+     edit: move brush near (-3055 1265 976) x+8
+     edit: move brush near (-3032 2120 1072) x-8
+     ... 83 more edits
+   times: 3.459 3.901 3.734  median 3.734s  (server 3.685s)  reverts: 0.739 0.740 0.713
+   server phases (median repetition):
+         0.005s  (init)
+         0.112s  LoadMapFile
+         0.042s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.013s  hull 0: Brush_LoadEntity
+         0.003s  hull 0: CountBrushes
+         0.159s  hull 0: BrushBSP auto
+         0.061s  hull 0: CountLeafs (x3)
+         0.115s  hull 0: MakeTreePortals (x3)
+         0.042s  hull 0: MakePortalsFromBuildportals (x3)
+         0.054s  hull 0: CalcTreeBounds (x3)
+         0.047s  hull 0: FillOutside (x2)
+         0.051s  hull 0: FillDetail (x2)
+         0.132s  hull 0: BrushBSP precise
+         0.013s  hull 0: MarkVisibleSides
+         0.032s  hull 0: MakeFaces
+         0.001s  hull 0: PruneNodes
+         0.034s  hull 0: WritePortalFile
+         0.047s  hull 0: TJunc
+         0.040s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.005s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.004s  hull 0 bmodels: CountBrushes (x263)
+         0.026s  hull 0 bmodels: MakeTreePortals (x263)
+         0.001s  hull 0 bmodels: MakePortalsFromBuildportals (x263)
+         0.004s  hull 0 bmodels: CalcTreeBounds (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.006s  hull 0 bmodels: MakeFaces (x263)
+         0.002s  hull 0 bmodels: PruneNodes (x263)
+         0.010s  hull 0 bmodels: CountLeafs (x263)
+         0.011s  hull 0 bmodels: TJunc (x263)
+         0.005s  hull 0 bmodels: EmitFaces (x263)
+         0.003s  hull 1: (start)
+         0.079s  hull 1: Brush_LoadEntity
+         0.004s  hull 1: CountBrushes
+         0.520s  hull 1: BrushBSP precise
+         0.039s  hull 1: CountLeafs (x2)
+         0.149s  hull 1: MakeTreePortals
+         0.059s  hull 1: MakePortalsFromBuildportals
+         0.014s  hull 1: CalcTreeBounds
+         0.047s  hull 1: FillOutside
+         0.015s  hull 1: FillDetail
+         0.008s  hull 1: PruneNodes
+         0.004s  hull 1 bmodels: (start)
+         0.002s  hull 2: (start)
+         0.076s  hull 2: Brush_LoadEntity
+         0.003s  hull 2: CountBrushes
+         0.994s  hull 2: BrushBSP precise
+         0.050s  hull 2: CountLeafs (x2)
+         0.270s  hull 2: MakeTreePortals
+         0.086s  hull 2: MakePortalsFromBuildportals
+         0.023s  hull 2: CalcTreeBounds
+         0.057s  hull 2: FillOutside
+         0.024s  hull 2: FillDetail
+         0.013s  hull 2: PruneNodes
+         0.004s  hull 2 bmodels: (start)
+         0.001s  (after hull 2 bmodels)
+         0.061s  FinishBSPFile
+   BENCH status=done elapsed=3.685 phase=2952 name="FinishBSPFile" count=0 max=0 pct=0.00 units=1739527
+   reference qbsp: 10.710 9.176 9.481  median 9.481s
+         0.128s  LoadMapFile
+         0.050s  ProcessMapBrushes
+         0.000s  hull 0: (start)
+         0.015s  hull 0: Brush_LoadEntity
+         0.000s  hull 0: CountBrushes
+         0.205s  hull 0: BrushBSP auto
+         0.062s  hull 0: CountLeafs (x3)
+         0.156s  hull 0: MakeTreePortals (x3)
+         0.065s  hull 0: MakePortalsFromBuildportals (x3)
+         0.014s  hull 0: CalcTreeBounds (x3)
+         0.056s  hull 0: FillOutside (x2)
+         0.056s  hull 0: FillDetail (x2)
+         0.162s  hull 0: BrushBSP precise
+         0.012s  hull 0: MarkVisibleSides
+         0.040s  hull 0: MakeFaces
+         0.002s  hull 0: PruneNodes
+         0.040s  hull 0: WritePortalFile
+         0.056s  hull 0: TJunc
+         0.049s  hull 0: EmitFaces
+         0.000s  hull 0 bmodels: (start)
+         0.007s  hull 0 bmodels: Brush_LoadEntity (x263)
+         0.001s  hull 0 bmodels: CountBrushes (x263)
+         0.069s  hull 0 bmodels: BrushBSP fast (x263)
+         0.018s  hull 0 bmodels: CountLeafs (x789)
+         0.073s  hull 0 bmodels: MakeTreePortals (x526)
+         0.004s  hull 0 bmodels: MakePortalsFromBuildportals (x526)
+         0.012s  hull 0 bmodels: CalcTreeBounds (x526)
+         0.005s  hull 0 bmodels: FillBrushEntity (x263)
+         0.070s  hull 0 bmodels: BrushBSP precise (x263)
+         0.001s  hull 0 bmodels: MarkVisibleSides (x263)
+         0.008s  hull 0 bmodels: MakeFaces (x263)
+         0.004s  hull 0 bmodels: PruneNodes (x263)
+         0.015s  hull 0 bmodels: TJunc (x263)
+         0.008s  hull 0 bmodels: EmitFaces (x263)
+         0.000s  hull 1: (start)
+         0.098s  hull 1: Brush_LoadEntity
+         0.001s  hull 1: CountBrushes
+         0.241s  hull 1: ChopBrushes
+         1.613s  hull 1: BrushBSP fast
+         0.094s  hull 1: CountLeafs (x3)
+         0.563s  hull 1: MakeTreePortals (x2)
+         0.206s  hull 1: MakePortalsFromBuildportals (x2)
+         0.044s  hull 1: CalcTreeBounds (x2)
+         0.130s  hull 1: FillOutside (x2)
+         0.063s  hull 1: FillDetail (x2)
+         0.857s  hull 1: BrushBSP precise
+         0.008s  hull 1: PruneNodes
+         0.000s  hull 1 bmodels: (start)
+         0.011s  hull 1 bmodels: Brush_LoadEntity (x263)
+         0.000s  hull 1 bmodels: CountBrushes (x263)
+         0.007s  hull 1 bmodels: ChopBrushes (x263)
+         0.060s  hull 1 bmodels: BrushBSP fast (x263)
+         0.003s  hull 1 bmodels: CountLeafs (x263)
+         0.000s  hull 2: (start)
+         0.085s  hull 2: Brush_LoadEntity
+         0.000s  hull 2: CountBrushes
+         0.286s  hull 2: ChopBrushes
+         1.440s  hull 2: BrushBSP fast
+         0.096s  hull 2: CountLeafs (x3)
+         0.534s  hull 2: MakeTreePortals (x2)
+         0.222s  hull 2: MakePortalsFromBuildportals (x2)
+         0.046s  hull 2: CalcTreeBounds (x2)
+         0.135s  hull 2: FillOutside (x2)
+         0.068s  hull 2: FillDetail (x2)
+         0.911s  hull 2: BrushBSP precise
+         0.010s  hull 2: PruneNodes
+         0.000s  hull 2 bmodels: (start)
+         0.011s  hull 2 bmodels: Brush_LoadEntity (x263)
+         0.000s  hull 2 bmodels: CountBrushes (x263)
+         0.008s  hull 2 bmodels: ChopBrushes (x263)
+         0.062s  hull 2 bmodels: BrushBSP fast (x263)
+         0.003s  hull 2 bmodels: CountLeafs (x263)
+         0.001s  (after hull 2 bmodels)
+         0.055s  FinishBSPFile
+   BENCH status=done elapsed=9.442 phase=7701 name="FinishBSPFile" count=0 max=0 pct=0.00 units=4743479
+   check: SAME
+     ok   entities: 5870 lines identical
+     ok   models: 264
+     ok   surfaces: 393 model/texture groups, 67514285 units^2
+     ok   hull 0 contents: 0 of 46300 random differ
+     ok   hull 1 contents: 0 of 46300 random differ
+     ok   hull 2 contents: 0 of 46300 random differ
+

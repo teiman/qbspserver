@@ -143,6 +143,30 @@ Brush entities (doors, platforms, buttons...) the same, per entity, without the 
 
 Result: TOTAL 18.7 s → **13.8 s** (-26%); e3m4 entity / texture edits 1.3-1.4 s → 0.66-0.78 s (10-12x faster than `qbsp`), geometry edits -12% to -30% (the 263 brush entities are reused). quakemash: entity / texture edits 17 s → **5 s** (54x), brush edits 26 s → 21 s (13x). Against the start (74.9 s): **5.4x**.
 
+### 7. Review: what was checked, and the measuring fixed
+
+A general review before going on (see `git log`):
+
+- **Plain qbsp is unchanged**: our `qbsp` writes byte-identical BSPs to the original on 56 of 60 test maps (the other 4 are not deterministic even with the original).
+- **Correctness on many maps**: `tools/sweep.py` compiles every Quake 1 test map of ericw-tools (water, sky, detail, fences, clip, hint, skip, origin brushes, external maps...) with plain qbsp and with the server (first compile and a cached recompile) and compares them with `bspcheck`: 79 of 80 play the same. The 80th, `q1_hull1_fail`, is a known qbsp bug (a "phantom clip brush" in hull 1, its unit test is skipped): plain qbsp gets it wrong, the server (no chopping of the clipping hulls) gets it right.
+- **Measuring blind spots, fixed** (scenarios v2, method 4, new baseline `baseline v2`): e3m4 had no textures (its LibreQuake wads aren't in the tree), so every face was "(missing)": bspcheck couldn't see a wrong texture there, and texture loading wasn't measured. `tools/makewad.py` makes a placeholder wad with its 83 texture names. New scenarios `bigmove` (a brush >= 512 units: walls and floors span several cells) and `align` (texture alignment), and bspcheck compares area-weighted texture coordinates per texture. `bigmove` turned out to cost the same as `move`.
+- **BSP29 limits**: the grid and the unchopped clipping hulls have 6-14% more clipnodes. A map that just fits BSP29 (32767 clipnodes) with plain qbsp could then not fit, and qbsp would silently switch to BSP2. Now, when the output doesn't fit with the grid on, the server builds the clipping hulls like plain qbsp and compiles again; if it doesn't fit without the grid either, plain qbsp would switch too, and the grid goes back on (`QBSPSERVER_FAKE_CLIPNODE_LIMIT=N` to test it).
+- **Where qbsp stands in a full iteration** (e3m4, geometry edit): qbspserver 2.3 s, `light` (GPU) 0.9 s, `vis -fast` 0.5 s, gridvis 0.15 s. qbsp is still the biggest part; with high-quality light (`-extra4 -bounce`, 3.6 s) light is.
+
+Baseline v2 (method 4): 74.6 s; with steps 0-6: 19.2 s.
+
+### 8. Cell portals
+
+A portal is made from its node's plane clipped by every parent's plane, then split down both sides. Inside a cell, the parents above the cell are grid planes, so the portals between two leaves of the same cell only depend on the cell's box and subtree: each cell keeps them, and `MakeTreePortals_r` only splits the cell's boundary portals down its subtree. Exact. Gain smaller than hoped (most portal time is creating and linking all portals, and the grid planes' portals): clipping hull portals 0.21-0.30 s → 0.16-0.18 s on e3m4.
+
+Also: `CountLeafs` (statistics only) computed each leaf's height by walking up to the root (leaves × depth); now counted on the way down, same numbers. Together: TOTAL 19.2 s → 17.9 s (-7%).
+
+### 9. Facing index in `SelectSplitPlane` (plain qbsp too)
+
+qbsp's precise split choice tests every candidate plane against every brush of the node, and that test starts by looking through **all sides of the brush** for one on the candidate plane: a node cost (number of sides)². Now the node indexes once which brushes have a side on which plane (keeping the first such side, like the loop), and the test is a lookup. Same choices in the same order: **byte-identical output** (checked on 42 test maps, small, e3m4, quakemash).
+
+Plain qbsp on quakemash: **273 s → 156 s (1.75x)**, its `BrushBSP` time 186 s → 86 s. In the server the precise passes on small and e3m4 were already small: within the noise there (TOTAL 18.4 s); it matters for big maps (hull 0's precise pass) and for the first compile.
+
 ### Tried and dropped
 
 - **Hull 0 in one pass** (like step 2): bspcheck failed on e3m4. Hull 0's faces come from the final tree's portals, and a tree built with the final pass's marks lost a few faces (0.01% of the drawn area). Hull 0 keeps its two passes.
@@ -274,4 +298,4 @@ qbspreceive [-port N] mapname[.map]
 
 1. **Done: client/server.** Both programs, the protocol, log streaming and exit codes. Each request still runs a **full** `qbsp` compile in the server process (`InitQBSP` + `ProcessFile`, like `qbsp` itself).
 2. **Done: measuring.** Benchmark with scenarios, reference compiles, equivalence checks and a history (see Measuring). Profile: the collision hulls are ~90% of the time (see Change tracking). Baseline logged as `baseline: full qbsp per request`: **TOTAL 81.8 s** (small 11.5 s, e3m4 70.3 s), reference 81.9 s, speedup 1.00x, all checks OK. Over the 42 paired repetitions the server is as fast as plain `qbsp` (ratio median 1.03 on small, 0.99 on e3m4), as expected while it still compiles everything.
-3. **In progress: incremental compiles** (see Incremental compiles). Done: no throttling, whole clipping hulls, one-pass hulls, cells, no hull chopping, unchanged-map shortcut, hull 0 tree reuse. Benchmark TOTAL 74.9 s → 13.8 s (5.4x). Next candidates: the clipping hulls' `MakeTreePortals` (per-cell portals), hull 0 for geometry edits without degrading its tree, map loading (parse only the entities that changed).
+3. **In progress: incremental compiles** (see Incremental compiles). Done: no throttling, whole clipping hulls, one-pass hulls, cells, no hull chopping, unchanged-map shortcut, hull 0 tree reuse. Benchmark TOTAL 74.9 s → 13.8 s (5.4x); with the v2 scenarios (baseline 74.6 s): 17.9-18.4 s (4.1x), plus cell portals and the facing index (plain qbsp 1.75x faster on quakemash). Next candidates: the clipping hulls' `MakeTreePortals` (per-cell portals), hull 0 for geometry edits without degrading its tree, map loading (parse only the entities that changed).

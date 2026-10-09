@@ -35,6 +35,8 @@
 
 #include "tbb/task_group.h"
 #include <qbsp/hullcache.hh>
+#include <algorithm>
+#include <unordered_map>
 
 // if a brush just barely pokes onto the other side,
 // let it slide by without chopping
@@ -261,8 +263,10 @@ TestBrushToPlanenum
 
 ============
 */
-static int TestBrushToPlanenum(
-    const bspbrush_t &brush, size_t planenum, int *numsplits, bool *hintsplit, int *epsilonbrush)
+// known_facing: -1 = look at the brush's sides; otherwise the caller already knows the result of
+// that loop (0: no side on the plane, or PSIDE_*|PSIDE_FACING), see SelectSplitPlane
+static int TestBrushToPlanenum(const bspbrush_t &brush, size_t planenum, int *numsplits, bool *hintsplit,
+    int *epsilonbrush, int known_facing = -1)
 {
     if (numsplits) {
         *numsplits = 0;
@@ -273,11 +277,15 @@ static int TestBrushToPlanenum(
 
     // if the brush actually uses the planenum,
     // we can tell the side for sure
-    for (auto &side : brush.sides) {
-        if (side.planenum == planenum) {
-            return PSIDE_BACK | PSIDE_FACING;
-        } else if (side.planenum == (planenum ^ 1)) {
-            return PSIDE_FRONT | PSIDE_FACING;
+    if (known_facing > 0) {
+        return known_facing;
+    } else if (known_facing < 0) {
+        for (auto &side : brush.sides) {
+            if (side.planenum == planenum) {
+                return PSIDE_BACK | PSIDE_FACING;
+            } else if (side.planenum == (planenum ^ 1)) {
+                return PSIDE_FRONT | PSIDE_FACING;
+            }
         }
     }
 
@@ -985,6 +993,30 @@ static side_t *SelectSplitPlane(
     side_t *bestside = nullptr;
     int bestvalue = -99999;
 
+    // Which brushes have a side on a plane (the first test of TestBrushToPlanenum), indexed once
+    // for the node: looping over every side of every brush for every candidate plane made a node
+    // cost (number of sides)^2. Same answer as that loop: the brush's first side on the plane, in
+    // either direction, decides.
+    std::unordered_map<size_t, std::vector<std::pair<uint32_t, int>>> facing_index;
+    {
+        std::vector<size_t> seen;
+        for (uint32_t i = 0; i < brushes.size(); i++) {
+            seen.clear();
+            for (auto &side : brushes[i]->sides) {
+                const size_t key = side.planenum & ~1;
+                if (std::find(seen.begin(), seen.end(), key) != seen.end()) {
+                    continue;
+                }
+                seen.push_back(key);
+                facing_index[key].emplace_back(
+                    i, side.planenum == key ? (PSIDE_BACK | PSIDE_FACING) : (PSIDE_FRONT | PSIDE_FACING));
+            }
+        }
+    }
+    std::vector<uint32_t> facing_stamp(brushes.size(), 0);
+    std::vector<int> facing_result(brushes.size(), 0);
+    uint32_t candidate = 0;
+
     // the search order goes: (changed from q2 tools - see q2_detail_leak_test.map for the issue
     // with the vanilla q2 tools method):
     //
@@ -1033,9 +1065,19 @@ static side_t *SelectSplitPlane(
                 int epsilonbrush = 0;
                 bool hintsplit = false;
 
-                for (auto &test : brushes) {
+                candidate++;
+                if (auto it = facing_index.find(positive_planenum); it != facing_index.end()) {
+                    for (auto &[i, result] : it->second) {
+                        facing_stamp[i] = candidate;
+                        facing_result[i] = result;
+                    }
+                }
+
+                for (size_t ti = 0; ti < brushes.size(); ti++) {
+                    auto &test = brushes[ti];
                     int bsplits;
-                    int s = TestBrushToPlanenum(*test, positive_planenum, &bsplits, &hintsplit, &epsilonbrush);
+                    const int known = facing_stamp[ti] == candidate ? facing_result[ti] : 0;
+                    int s = TestBrushToPlanenum(*test, positive_planenum, &bsplits, &hintsplit, &epsilonbrush, known);
 
                     splits += bsplits;
                     if (bsplits && (s & PSIDE_FACING))
