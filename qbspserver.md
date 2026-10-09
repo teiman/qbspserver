@@ -175,7 +175,14 @@ Each plane is now evaluated once per node and pass (a per-thread stamp per plane
 
 Plain qbsp on quakemash: 156 s → **127 s** (and 273 s before step 9: **2.15x** in all). What's left in that pass is the trial split itself (exact, can't be skipped without computing it), and splitting the brushes. Tried and no gain: the cut winding of `SplitBrush` on the stack (no allocations), and checking the plane stamp before the texture flags.
 
+### 11. Small pieces of the clipping hulls (option 1)
+
+Profiled an e3m4 geometry edit (clipping hulls: 1.15 s of 2.4 s). Exact changes, byte-identical output, also in plain qbsp: `CountLeafs` counts locally and adds to the stats once per contents (the stats lock a mutex per call); the outside flood fills use a deque instead of a list (an allocation per push) and mark visited leaves with `outside_distance` instead of a hash set; the tree's portals live in a deque instead of one allocation each. About -3% on an e3m4 geometry edit; this kind of piece is now exhausted (see below).
+
 ### Tried and dropped
+- **Caching the clipping hulls' expanded brushes** (`LoadBrush`: hull expansion, bevels, windings): `Brush_LoadEntity` went 0.09 → 0.08 s, within the noise; the expansion isn't its cost. Reverted.
+- **Progress bars**: every percent update is printed and flushed; a server with `-nopercent` is just as fast. Not a cost.
+- **`SplitBrush`'s cut winding on the stack**, and checking the plane stamp before the texture flags (step 10): no gain.
 
 - **Hull 0 in one pass** (like step 2): bspcheck failed on e3m4. Hull 0's faces come from the final tree's portals, and a tree built with the final pass's marks lost a few faces (0.01% of the drawn area). Hull 0 keeps its two passes.
 - **Hull 0's final tree with midsplit for big nodes** (`AUTO`, like its first pass): no time saved on small or e3m4, and 70-90% more nodes and leaves, 26-40% more faces: slower `vis` and `light`, bigger BSP. Same reason not to put hull 0 on the cell grid: grid planes cut through open space.
