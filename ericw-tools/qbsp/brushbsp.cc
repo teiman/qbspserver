@@ -36,6 +36,10 @@
 #include "tbb/task_group.h"
 #include <qbsp/hullcache.hh>
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <optional>
 #include <unordered_map>
 
 // if a brush just barely pokes onto the other side,
@@ -862,8 +866,42 @@ ChooseMidPlaneFromList
 The clipping hull BSP doesn't worry about avoiding splits
 ==================
 */
+// QBSP_PROFILE_BSP=1: where BuildTree_r spends its time, summed over threads, printed per BrushBSP
+static const bool profile_bsp = std::getenv("QBSP_PROFILE_BSP") != nullptr;
+struct bsp_profile_t
+{
+    std::atomic<int64_t> choose_mid{0}, choose_precise{0}, side_test{0}, split_brushes{0}, split_volume{0},
+        leaf{0};
+    std::atomic<int64_t> nodes{0}, mid_candidates{0}, mid_distinct{0}, mid_volume_checks{0};
+    void reset()
+    {
+        for (auto *a : {&choose_mid, &choose_precise, &side_test, &split_brushes, &split_volume, &leaf, &nodes,
+                 &mid_candidates, &mid_distinct, &mid_volume_checks}) {
+            *a = 0;
+        }
+    }
+};
+static bsp_profile_t bsp_profile;
+
+struct bsp_timer
+{
+    std::atomic<int64_t> &target;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    ~bsp_timer()
+    {
+        target += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start)
+                      .count();
+    }
+};
+#define BSP_PROFILE(name) std::optional<bsp_timer> bsp_timer_##name; if (profile_bsp) bsp_timer_##name.emplace(bsp_profile.name)
+
 static side_t *ChooseMidPlaneFromList(const bspbrush_t::container &brushes, const node_t *node)
 {
+    if (profile_bsp) {
+        for (auto &brush : brushes) {
+            bsp_profile.mid_candidates += brush->sides.size();
+        }
+    }
     double bestaxialmetric = VECT_MAX;
     side_t *bestaxialplane = nullptr;
 
@@ -880,14 +918,35 @@ static side_t *ChooseMidPlaneFromList(const bspbrush_t::container &brushes, cons
     //
     // If any valid plane is available in a pass, no further
     // passes will be tried.
+    // Many sides share a plane (11M candidate sides, 4.4M distinct planes in e3m4's hull 1):
+    // each plane is evaluated once per pass. Its volume check and metric only depend on the plane
+    // and the node, and a later side with the same plane could only tie (the comparisons below are
+    // strict), so the choice is the same.
+    thread_local std::vector<uint32_t> evaluated; // planenum / 2 -> stamp
+    thread_local uint32_t stamp = 0;
+    if (evaluated.size() < map.planes.size() / 2 + 1) {
+        evaluated.resize(map.planes.size() / 2 + 1, 0);
+    }
+
     constexpr int numpasses = 4;
     for (int pass = 0; pass < numpasses; pass++) {
+        if (++stamp == 0) { // wrapped: start over
+            std::fill(evaluated.begin(), evaluated.end(), 0);
+            stamp = 1;
+        }
         for (auto &brush : brushes) {
             // FIXME: these conditions need to be kept in sync with SelectSplitPlane
             // ideally, should be deduplicated somehow
             if ((pass >= 2) != brush->contents.is_any_detail())
                 continue;
             for (auto &side : brush->sides) {
+                // a plane already evaluated in this pass is skipped whatever the filters below say
+                // about this side, so check that first: it saves the texinfo lookups
+                const size_t positive_planenum = side.planenum & ~1;
+                if (evaluated[positive_planenum / 2] == stamp) {
+                    continue;
+                }
+
                 if (side.bevel)
                     continue; // never use a bevel as a spliter
                 if (!side.w)
@@ -899,10 +958,13 @@ static side_t *ChooseMidPlaneFromList(const bspbrush_t::container &brushes, cons
                 if (side.is_visible() != (pass == 0 || pass == 2))
                     continue; // only check visible faces on pass 0/2
 
-                size_t positive_planenum = side.planenum & ~1;
                 const qbsp_plane_t &plane = side.get_positive_plane();
+                evaluated[positive_planenum / 2] = stamp;
 
 #if CHECK_PLANE_AGAINST_VOLUME
+                if (profile_bsp) {
+                    bsp_profile.mid_volume_checks++;
+                }
                 if (!CheckPlaneAgainstVolume(positive_planenum, node)) {
                     continue; // would produce a tiny volume
                 }
@@ -978,9 +1040,15 @@ static side_t *SelectSplitPlane(
         }
 
         if (split_type == tree_split_t::FAST) {
-            if (auto mid_plane = ChooseMidPlaneFromList(brushes, node)) {
+            side_t *mid_plane;
+            {
+                BSP_PROFILE(choose_mid);
+                mid_plane = ChooseMidPlaneFromList(brushes, node);
+            }
+            if (mid_plane) {
                 stats.c_midsplit++;
 
+                BSP_PROFILE(side_test);
                 for (auto &b : brushes) {
                     b->side = TestBrushToPlanenum(*b, mid_plane->planenum & ~1, nullptr, nullptr, nullptr);
                 }
@@ -1241,7 +1309,11 @@ static void BuildTree_r(tree_t &tree, int level, node_t *node, bspbrush_t::conta
         }
     } else {
         // find the best plane to use as a splitter
-        auto *bestside = SelectSplitPlane(brushes, node, split_type, stats);
+        side_t *bestside;
+        {
+            BSP_PROFILE(choose_precise); // (includes the FAST choice, counted apart in choose_mid)
+            bestside = SelectSplitPlane(brushes, node, split_type, stats);
+        }
 
         if (!bestside) {
             // this is a leaf node
@@ -1250,6 +1322,7 @@ static void BuildTree_r(tree_t &tree, int level, node_t *node, bspbrush_t::conta
             node->make_leaf();
 
             stats.c_leafs++;
+            BSP_PROFILE(leaf);
             LeafNode(node, std::move(brushes), stats);
 
             return;
@@ -1268,8 +1341,15 @@ static void BuildTree_r(tree_t &tree, int level, node_t *node, bspbrush_t::conta
     nodedata_t *nodedata = node->get_nodedata();
     nodedata->planenum = bestplane;
 
+    if (profile_bsp) {
+        bsp_profile.nodes++;
+    }
     auto &plane = map.get_plane(bestplane);
-    auto children = SplitBrushList(std::move(brushes), bestplane, stats);
+    std::array<bspbrush_t::container, 2> children;
+    {
+        BSP_PROFILE(split_brushes);
+        children = SplitBrushList(std::move(brushes), bestplane, stats);
+    }
 
     // allocate children before recursing
     for (int i = 0; i < 2; i++) {
@@ -1288,6 +1368,7 @@ static void BuildTree_r(tree_t &tree, int level, node_t *node, bspbrush_t::conta
 
     // to save time/memory we can destroy node's volume at this point
     if (node->volume) {
+        BSP_PROFILE(split_volume);
         auto children_volumes = SplitBrush(std::move(node->volume), bestplane, stats);
         node->volume = nullptr;
         nodedata->children[0]->volume = std::move(children_volumes[0]);
@@ -1409,11 +1490,25 @@ void BrushBSP(tree_t &tree, mapentity_t &entity, const bspbrush_t::container &br
     bspstats_t stats{};
 
     hullcache::cells_prepare(node->bounds, brushlist);
+    if (profile_bsp) {
+        bsp_profile.reset();
+    }
     {
         logging::percent_clock clock;
         BuildTree_r(tree, 0, tree.headnode, brushlist, split_type, stats, clock);
     }
     hullcache::cells_finish();
+    if (profile_bsp) {
+        auto ms = [](const std::atomic<int64_t> &us) { return us.load() / 1000.0; };
+        logging::print("BSPPROFILE {} brushes={} nodes={} | choose_mid {:.0f} ms, choose_precise(+mid) {:.0f} ms, "
+                       "side_test {:.0f} ms, split_brushes {:.0f} ms, split_volume {:.0f} ms, leaf {:.0f} ms | "
+                       "mid candidates {} distinct planes {} volume checks {}\n",
+            split_type == tree_split_t::PRECISE ? "precise" : split_type == tree_split_t::FAST ? "fast" : "auto",
+            brushlist.size(), bsp_profile.nodes.load(), ms(bsp_profile.choose_mid), ms(bsp_profile.choose_precise),
+            ms(bsp_profile.side_test), ms(bsp_profile.split_brushes), ms(bsp_profile.split_volume),
+            ms(bsp_profile.leaf), bsp_profile.mid_candidates.load(), bsp_profile.mid_distinct.load(),
+            bsp_profile.mid_volume_checks.load());
+    }
 
     stats.print_stats();
 

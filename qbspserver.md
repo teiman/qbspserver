@@ -167,6 +167,14 @@ qbsp's precise split choice tests every candidate plane against every brush of t
 
 Plain qbsp on quakemash: **273 s → 156 s (1.75x)**, its `BrushBSP` time 186 s → 86 s. In the server the precise passes on small and e3m4 were already small: within the noise there (TOTAL 18.4 s); it matters for big maps (hull 0's precise pass) and for the first compile.
 
+### 10. The FAST pass (plain qbsp)
+
+After step 9, qbsp's FAST pass (the clipping hulls' first tree: a midsplit on every node) was most of a plain compile of quakemash (60 of 156 s). `QBSP_PROFILE_BSP=1` now prints where `BuildTree_r` spends its time, per `BrushBSP` (CPU time summed over threads). e3m4, hull 1, FAST pass: choosing the plane 9.6 s (59%), splitting brushes 3.7 s, splitting the node volume 1.5 s. Choosing the plane went through 11.1 M candidate sides for only 4.4 M distinct planes per node, and each evaluated plane cost a trial split of the node's volume (`CheckSplitBrush`).
+
+Each plane is now evaluated once per node and pass (a per-thread stamp per plane, checked before the side's filters). The volume check and the metric only depend on the plane and the node, and the comparisons are strict, so the choice is the same: byte-identical output (41 test maps, small, e3m4, quakemash).
+
+Plain qbsp on quakemash: 156 s → **127 s** (and 273 s before step 9: **2.15x** in all). What's left in that pass is the trial split itself (exact, can't be skipped without computing it), and splitting the brushes. Tried and no gain: the cut winding of `SplitBrush` on the stack (no allocations), and checking the plane stamp before the texture flags.
+
 ### Tried and dropped
 
 - **Hull 0 in one pass** (like step 2): bspcheck failed on e3m4. Hull 0's faces come from the final tree's portals, and a tree built with the final pass's marks lost a few faces (0.01% of the drawn area). Hull 0 keeps its two passes.
