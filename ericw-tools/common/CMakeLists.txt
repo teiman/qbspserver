@@ -13,6 +13,7 @@ add_library(common STATIC
     litfile.cc
     lightgrid.cc
     log.cc
+    sampler.cc
     mathlib.cc
     parser.cc
     qvec.cc
@@ -40,6 +41,7 @@ add_library(common STATIC
     ../include/common/iterators.hh
     ../include/common/litfile.hh
     ../include/common/log.hh
+    ../include/common/sampler.hh
     ../include/common/mathlib.hh
     ../include/common/numeric_cast.hh
     ../include/common/parser.hh

@@ -37,6 +37,7 @@
 #include <cstdlib>
 
 #include <common/log.hh>
+#include <common/sampler.hh>
 #include <common/settings.hh>
 #include <common/cmdlib.hh>
 
@@ -158,7 +159,7 @@ static void report(bool timed_out)
         return;
     }
 
-    const std::string out = format_report(timed_out);
+    const std::string out = format_report(timed_out) + sampler::stop_and_report();
     std::fwrite(out.data(), 1, out.size(), stdout);
     std::fflush(stdout);
     if (logfile.is_open()) {
@@ -208,6 +209,9 @@ static void init()
 
     start_time = clock::now();
     std::atexit([] { report(false); });
+    if (const char *sample = std::getenv("ERICW_SAMPLE"); sample && std::atoi(sample) != 0) {
+        sampler::start();
+    }
 
     if (limit > 0) {
         std::thread([limit] {

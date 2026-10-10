@@ -187,9 +187,12 @@ public:
 
     constexpr aabb &unionWith_in_place(const aabb &other)
     {
+        // (not std::min({a, b, c}): MSVC sends an initializer list to its vectorized min_element
+        // routine, a library call for 3 values, which was ~14% of qbsp's busy time. The same value:
+        // both keep the first of equal values.)
         for (size_t i = 0; i < N; i++) {
-            m_corners[0][i] = std::min({m_corners[0][i], other.mins()[i], other.maxs()[i]});
-            m_corners[1][i] = std::max({m_corners[1][i], other.mins()[i], other.maxs()[i]});
+            m_corners[0][i] = std::min(std::min(m_corners[0][i], other.mins()[i]), other.maxs()[i]);
+            m_corners[1][i] = std::max(std::max(m_corners[1][i], other.mins()[i]), other.maxs()[i]);
         }
 
         return *this;
