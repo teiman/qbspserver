@@ -187,6 +187,12 @@ The filling of the world's clipping hulls (portals of the whole tree, flood from
 
 Full benchmark: TOTAL 18.4 s → **15.4 s** (-16%), all checks OK; e3m4 move 2.19 → 1.58 s (-28%), add 2.08 → 1.45 s (-30%), bigmove -19%. Against baseline v2 (74.6 s): **4.8x**.
 
+### 13. Hull 0's redundant portals; checked at scale
+
+Hull 0 made the world's portals again after filling, but filling only changes leaf contents and portals only depend on the tree: the portals made just before filling are reused (byte-identical BSP and `.prt`; plain qbsp benefits too). `CountLeafs` counts contents and heights in one walk.
+
+**quakemash checked against plain qbsp** (paired reference, bspcheck): entities, 2,073 models, 3,130 model/texture surface groups and 227,200 points per hull all the same, for a brush move and a texture change. Times: initial compile 130 s; brush move 15.2 s (plain qbsp now 134 s; the original 273 s); texture change 5.3 s.
+
 ### Tried and dropped
 - **Hull 0's first pass on the cell grid**: that tree only serves to find the side marks, which looked like a property of the geometry. Checked with a mode that also builds the usual first tree and compares (`QBSPSERVER_CHECK_MARKS`, removed with the attempt): 0 of 7.5k marks differ on small, but 11-14 of 28.8k on e3m4, and bspcheck sees the drawn faces change. The marks depend on the tree in edge cases; hull 0 keeps its usual first pass.
 - **Caching the clipping hulls' expanded brushes** (`LoadBrush`: hull expansion, bevels, windings): `Brush_LoadEntity` went 0.09 → 0.08 s, within the noise; the expansion isn't its cost. Reverted.
