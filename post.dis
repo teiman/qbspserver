@@ -1,25 +1,26 @@
-## qbspserver: incremental `qbsp` — speed report
+## qbspserver: incremental `qbsp` — speed report #2
 
-`qbspserver` keeps a map loaded in a background process and recompiles it when you run `qbspreceive` (e.g. from your editor's compile script). It remembers what it built last time and only redoes what your edit touched. The output doesn't need to be byte-identical to `qbsp`, only to **play the same**: every benchmark run checks that (entities, drawn surfaces per texture, and point contents in hulls 0/1/2 at ~46k points, including around every changed face).
+`qbspserver` keeps a map loaded in the background and recompiles it when you run `qbspreceive` (e.g. from your editor's compile script), redoing only what your edit touched. The output must **play the same** as `qbsp`, and every benchmark run checks it: entities, surfaces per texture, alignment, and hull 0/1/2 contents at ~46k points.
 
-**Benchmark** (7 edit scenarios × 2 maps, median of 3, paired with a plain `qbsp` run each time; Intel Core 7 240H laptop):
+**Benchmark** (9 edit scenarios × 2 maps, median of 3, paired with plain `qbsp`; Core 7 240H laptop):
 ```
-                      e3m4 (LibreQuake)   E1M1
-plain qbsp                 ~8.7 s         ~1.6 s
-qbspserver, no change      0.04 s         0.03 s
-  1 entity / 1 texture     1.3-1.4 s      0.35 s
-  1 brush moved / added    2.5-3.1 s      0.6 s
-  many edits (2% brushes)  4.3 s          0.7 s
+                       e3m4 (LibreQuake)   E1M1
+plain qbsp                  ~5.8 s         ~1.0 s
+qbspserver, no change       0.05 s         0.03 s
+  1 entity / 1 texture      0.6 s          0.17 s
+  1 brush moved / added     1.3 s          0.31 s
+  many edits (2% brushes)   2.8 s          0.45 s
 ```
-**Total of all scenarios: 74.9 s → 18.7 s (4.0×), 3.9× faster than plain qbsp.**
+**All scenarios: 13.3 s, 4.6× faster than plain qbsp** (first report: 18.7 s).
 
-Big map (quakemash, 35k brushes, plain qbsp 271 s): texture/entity edit **17 s (16×)**, brush edits **26 s (10×)**.
+**Big map** (quakemash, 35k brushes; qbsp was 271 s): texture edit **5.0 s**, entity **6.0 s**, brush moved **10.8 s**.
 
-**How**
-• Clipping hulls 1/2 (90% of a big compile) are reused whole when only textures or point entities change.
-• When geometry changes they're built in one pass instead of two, and split on a 1024-unit grid: only the cells you touched are rebuilt (1-2 of ~70).
-• Unchanged map + wads + bsp → answered instantly.
+**How:** clipping hulls reused whole on texture/entity edits; on geometry edits rebuilt only in the 1024-unit grid cells you touched; hull 0's tree reused when the brushes didn't change.
 
-**Bonus for everyone:** Windows 11 throttles "background" processes (EcoQoS: lower clocks / E-cores on hybrid CPUs). Compilers started from a script or editor can be hit: we measured **25% slower**. All ericw-tools programs in this fork now opt out of it.
+**Bonus for everyone: plain `qbsp` is 3.2× faster** (quakemash 271 → 84 s), with **byte-identical** BSP and .prt. Some finds:
+• The split plane choice re-scanned every brush side per candidate, on one thread at the top of the tree (4 s for one node).
+• `std::min({a, b, c})` in the bounds code: MSVC makes it a vectorized library call for 3 values. **14%** of the compile.
+• A `std::list` node per portal fragment: 12-16%.
+• Windows 11 throttles "background" processes (EcoQoS): 25% slower from an editor. This fork opts out.
 
-Still to do: hull 0 (now the slowest part on big maps) — without making the tree worse for `vis`.
+Next: map loading (1 s per compile on big maps), hulls built at the same time.
