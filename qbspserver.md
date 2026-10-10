@@ -300,6 +300,8 @@ Tested: two compiles of the same map (BSP2 vs BSP2, and BSP29 vs BSP2) are `SAME
 - `logging::bench_restart()` / `logging::bench_report()` measure each compile on its own; the server prints the table at the end of every compile, so `qbspreceive` shows it too.
 - `logging::bench_set_group()` prefixes the phases, and qbsp uses it per hull (`hull 1: BrushBSP`), so each hull's cost is visible.
 - `(init)` is the time before the first phase (options, filesystem, wads); `hull N: (start)` and `(after hull 2)` the time between phases.
+- `[N cores]`: the phase's process CPU time over its wall time, the average number of cores it kept busy. A phase's time runs until the next header, so work without its own header shows up under the previous one (e.g. `CountLeafs` includes `MakeMarkFaces` and `EmitVertices`).
+- `bench.py --print-blocks` prints the whole table of every measured compile.
 
 ## Project layout
 

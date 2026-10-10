@@ -71,7 +71,7 @@ DEFAULT_PORT = 26650  # not qbspserver's default, so a server you have open is n
 SERVER_START_TIMEOUT = 3600
 
 BENCH_LINE_RE = re.compile(r'^BENCH status=\S+ elapsed=([\d.]+)')
-PHASE_RE = re.compile(r'^\s*([\d.]+)s\s+(.+?)(?: \(x(\d+)\))?\s*$')
+PHASE_RE = re.compile(r'^\s*([\d.]+)s\s+(.+?)(?: \(x(\d+)\))?(?:\s+\[[\d.]+ cores\])?\s*$')
 
 
 def parse_bench(text):
@@ -276,6 +276,9 @@ def bench_map(name, args, details):
                 code, wall, out = receive(work_map, args.port)
                 elapsed, phases, block = parse_bench(out)
                 run = {'wall': wall, 'server': elapsed, 'code': code, 'phases': phases, 'block': block}
+                if args.print_blocks:
+                    print(f'   --- {name} / {scen}, repetition {rep + 1}: server phases', flush=True)
+                    print('\n'.join('   ' + line for line in block.splitlines()), flush=True)
                 if code != 0:
                     tail = '\n'.join(out.strip().splitlines()[-5:])
                     raise RuntimeError(f'{name}/{scen}: qbspreceive exit code {code}\n{tail}')
@@ -505,6 +508,8 @@ def main():
     ap.add_argument('--qbsp-args', default='-bsp2', help='qbsp options, for the server and the reference')
     ap.add_argument('--server-args', default='', help='qbspserver-only options, e.g. -nohullcache (to compare)')
     ap.add_argument('--warmup', type=float, default=60, help='seconds of compiles before measuring (0 = none)')
+    ap.add_argument('--print-blocks', action='store_true',
+                    help="print every measured compile's phase table (wall time, cores in use)")
     ap.add_argument('--keep', action='store_true', help='keep testmap/_bench_* work files')
     ap.add_argument('--no-log', dest='log', action='store_false', help='do not write the history (trial runs)')
     args = ap.parse_args()

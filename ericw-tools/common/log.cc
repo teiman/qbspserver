@@ -74,10 +74,36 @@ using clock = std::chrono::steady_clock;
 static bool enabled = false;
 static clock::time_point start_time;
 static std::mutex phase_mutex;
-static std::vector<std::pair<std::string, clock::time_point>> phases;
+struct phase_t
+{
+    std::string name;
+    clock::time_point start;
+    double cpu_start; // process CPU time (all threads), seconds
+};
+static std::vector<phase_t> phases;
 static std::atomic<uint64_t> cur_count = 0, cur_max = 0, total_units = 0;
 static std::atomic<bool> reported = false;
 static std::string group; // prefix for phase names, see bench_set_group()
+
+// CPU time used by the process so far (all threads), in seconds: a phase's CPU time over its wall
+// time is how many cores it kept busy on average
+static double process_cpu_seconds()
+{
+#ifdef _WIN32
+    FILETIME creation, exit, kernel, user;
+    if (!GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user)) {
+        return 0.0;
+    }
+    auto to_seconds = [](const FILETIME &t) {
+        return ((static_cast<uint64_t>(t.dwHighDateTime) << 32) | t.dwLowDateTime) * 1e-7; // 100 ns units
+    };
+    return to_seconds(kernel) + to_seconds(user);
+#else
+    timespec ts;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    return ts.tv_sec + ts.tv_nsec * 1e-9;
+#endif
+}
 
 static double seconds_since(clock::time_point t)
 {
@@ -92,28 +118,33 @@ static std::string format_report(bool timed_out)
     const double pct = determinate ? 100.0 * static_cast<double>(std::min(count, max)) / max : 0.0;
 
     std::lock_guard lock(phase_mutex);
-    const std::string name = phases.empty() ? "(start)" : phases.back().first;
+    const std::string name = phases.empty() ? "(start)" : phases.back().name;
 
     std::string out = fmt::format("\n==== BENCH ({}) ====\n", timed_out ? "timelimit" : "finished");
     // aggregate by name (qbsp repeats phases per entity), in order of first appearance
-    std::vector<std::tuple<std::string, double, size_t>> totals;
+    std::vector<std::tuple<std::string, double, size_t, double>> totals;
+    const double cpu_now = process_cpu_seconds();
     for (size_t i = 0; i < phases.size(); i++) {
-        auto end = (i + 1 < phases.size()) ? phases[i + 1].second : clock::now();
-        double secs = std::chrono::duration<double>(end - phases[i].second).count();
+        auto end = (i + 1 < phases.size()) ? phases[i + 1].start : clock::now();
+        double secs = std::chrono::duration<double>(end - phases[i].start).count();
+        double cpu = ((i + 1 < phases.size()) ? phases[i + 1].cpu_start : cpu_now) - phases[i].cpu_start;
         auto it = std::find_if(
-            totals.begin(), totals.end(), [&](const auto &t) { return std::get<0>(t) == phases[i].first; });
+            totals.begin(), totals.end(), [&](const auto &t) { return std::get<0>(t) == phases[i].name; });
         if (it == totals.end()) {
-            totals.emplace_back(phases[i].first, secs, 1);
+            totals.emplace_back(phases[i].name, secs, 1, cpu);
         } else {
             std::get<1>(*it) += secs;
             std::get<2>(*it)++;
+            std::get<3>(*it) += cpu;
         }
     }
-    for (auto &[phase_name, secs, times] : totals) {
+    for (auto &[phase_name, secs, times, cpu] : totals) {
+        // [cores]: CPU time / wall time, the average number of cores the phase kept busy
+        const std::string cores = secs >= 0.001 ? fmt::format("  [{:.1f} cores]", cpu / secs) : "";
         if (times > 1) {
-            out += fmt::format("  {:>9.3f}s  {} (x{})\n", secs, phase_name, times);
+            out += fmt::format("  {:>9.3f}s  {} (x{}){}\n", secs, phase_name, times, cores);
         } else {
-            out += fmt::format("  {:>9.3f}s  {}\n", secs, phase_name);
+            out += fmt::format("  {:>9.3f}s  {}{}\n", secs, phase_name, cores);
         }
     }
     out += fmt::format("BENCH status={} elapsed={:.3f} phase={} name=\"{}\" count={} max={} pct={:.2f} units={}\n",
@@ -142,7 +173,7 @@ static void on_header(const char *name)
         return;
     }
     std::lock_guard lock(phase_mutex);
-    phases.emplace_back(group.empty() ? std::string(name) : group + ": " + name, clock::now());
+    phases.push_back({group.empty() ? std::string(name) : group + ": " + name, clock::now(), process_cpu_seconds()});
     cur_count = 0;
     cur_max = 0;
 }
@@ -194,7 +225,7 @@ void bench_restart()
     bench::enabled = true;
     bench::start_time = bench::clock::now();
     // time before the first header (option parsing, filesystem / wad setup...)
-    bench::phases.assign(1, {"(init)", bench::start_time});
+    bench::phases.assign(1, {"(init)", bench::start_time, bench::process_cpu_seconds()});
     bench::group.clear();
     bench::cur_count = 0;
     bench::cur_max = 0;
@@ -212,7 +243,7 @@ void bench_set_group(std::string group)
     // the time until the group's first header is its own phase, not the end of the previous one
     if (bench::enabled) {
         std::string name = group.empty() ? "(after " + bench::group + ")" : group + ": (start)";
-        bench::phases.emplace_back(std::move(name), bench::clock::now());
+        bench::phases.push_back({std::move(name), bench::clock::now(), bench::process_cpu_seconds()});
     }
     bench::group = std::move(group);
 }
