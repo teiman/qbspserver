@@ -18,17 +18,16 @@
   },
   "quakemash": {
     "attempts": {
+      "bigmove": 1,
       "entity": 0,
       "geotex": 1,
-      "many": 0,
       "move": 0,
-      "nochange": 0,
       "texture": 0
     },
     "base_hash": "7d902c2a094a",
     "base_leaks": false,
     "qbsp_args": "-bsp2",
-    "scenario_version": 1
+    "scenario_version": 2
   },
   "small": {
     "attempts": {
