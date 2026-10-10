@@ -1,68 +1,90 @@
-qbspserver - incremental qbsp for Quake maps (based on ericw-tools)
-=====================================================================
+qbspserver
+==========
 
-qbspserver keeps your map loaded in a background process and recompiles it
-when you run qbspreceive, redoing only what your edit touched. A texture or
-entity change on a big map takes seconds instead of minutes.
+qbspserver is the qbsp from ericw-tools, changed so that it can stay open
+while you work on a map. You start it once, and from then on each compile
+only redoes the parts of the map you changed. vis and light are not affected.
 
-The BSP it writes is not byte-identical to plain qbsp's, but it plays the
-same: same entities, same drawn surfaces and textures, same collision.
-For release builds, compile with plain qbsp as usual.
+More, with pictures: https://github.com/teiman/qbspserver
 
 
 Files
 -----
-qbspserver.exe    the server: compiles the map once, then again on each request
-qbspreceive.exe   asks the running server to compile, prints its log
-qbsp.exe          plain qbsp (ericw-tools), about 3x faster on big maps,
-                  with byte-identical output: a drop-in replacement
+qbspserver.exe    stays open while you map, does the qbsp work
+qbspreceive.exe   goes where qbsp used to be in your compile: asks
+                  qbspserver to compile, shows the same messages
+qbsp.exe          the normal ericw-tools qbsp with speed fixes: identical
+                  output, about a third of the time on big maps. Use it
+                  instead of your qbsp.exe if you like, with or without
+                  qbspserver.
 
 
-Use
----
-1. Start the server once, with the options you give qbsp, and leave it open:
+What changes in the way you work
+--------------------------------
+1. When you sit down to map, open qbspserver on your map (a .bat file you
+   double-click, see below). It compiles once, then waits in its window.
+2. In your compile .bat or TrenchBroom profile, the qbsp line uses
+   qbspreceive instead.
 
-       qbspserver.exe -bsp2 C:\maps\mymap.map
+vis, light, your engine and the way you test stay as they are.
 
-   The first compile is a full one.
 
-2. Each time you want to test, save the map in your editor and run:
+If you compile with a .bat file
+-------------------------------
+start-server.bat (double-click it when you start mapping, leave it open):
 
-       qbspreceive.exe C:\maps\mymap.map
+    C:\tools\qbspserver\qbspserver.exe C:\maps\mymap.map
 
-   It writes mymap.bsp (and .prt) next to the .map, like qbsp. Then run
-   vis / light / your engine as usual.
+Your compile file, with the first line changed:
 
-TrenchBroom: in the compile profile, replace the qbsp step with
-qbspreceive.exe and the map path. Start qbspserver.exe yourself before.
+    C:\tools\qbspserver\qbspreceive.exe C:\maps\mymap.map
+    C:\tools\ericw-tools\vis.exe -fast C:\maps\mymap.bsp
+    C:\tools\ericw-tools\light.exe C:\maps\mymap.bsp
 
-Options
--------
-qbspserver [-port N] [-nohullcache] [qbsp options...] mapname[.map]
-    Any qbsp option (-bsp2, -notex...); it is used for every compile.
-    -port N        another port (default 26600; use the same for qbspreceive)
-    -nohullcache   rebuild everything on every compile (to compare)
+qbsp options (like -bsp2) go in start-server.bat:
+    qbspserver.exe -bsp2 C:\maps\mymap.map
 
+
+If you compile from TrenchBroom
+-------------------------------
+In a copy of your profile (Run > Compile Map...), change only the qbsp task:
+
+    Tool:        C:\tools\qbspserver\qbspreceive.exe
+    Parameters:  ${MAP_BASE_NAME}-compile.map
+
+Compile once with your usual profile, so mymap-compile.map exists in the
+profile's working directory. In that folder, make a start-server.bat:
+
+    C:\tools\qbspserver\qbspserver.exe mymap-compile.map mymap.bsp
+
+Double-click it, leave it open, and compile from TrenchBroom as usual.
+(TrenchBroom can't open qbspserver itself: it would wait for it to finish.)
+
+
+Day to day
+----------
+- Open qbspserver when you start mapping, close its window when you're
+  done. It holds one map: for another map, close it and open it on that one.
+- "no server": qbspserver isn't open. "holds another map": the map path in
+  your compile isn't the one qbspserver was opened with.
+- Leaks and errors show up as with qbsp. qbspserver keeps running.
+- The first compile after opening it takes the usual time.
+
+The map plays the same as with plain qbsp, but the .bsp file isn't
+identical byte for byte. For the version you release, use plain qbsp.
+
+
+Command line
+------------
+qbspserver [-port N] [qbsp options...] mapname[.map] [output.bsp]
 qbspreceive [-port N] mapname[.map]
-    Exit code: 0 compiled, 1 compile failed, 2 no server running,
-    3 rejected (the server holds another map). Usable in scripts:
-        qbspreceive mymap.map && light mymap.bsp
-
-One server holds one map. Close it with Ctrl+C. Windows only (64-bit).
-
-
-Speed (Intel Core 7 laptop)
----------------------------
-                         e3m4      E1M1     quakemash (35k brushes)
-plain qbsp (original)    8.7 s     1.6 s    271 s
-qbspserver, no change    0.04 s    0.03 s   instant
-  1 entity changed       0.25 s    0.10 s   ~2 s
-  1 texture changed      0.65 s    0.2 s    5 s
-  1 brush moved / added  1.3 s     0.3 s    11 s
+    -port N   a second qbspserver on another port (default 26600)
+    qbspreceive exit codes: 0 compiled, 1 compile failed, 2 no qbspserver,
+    3 qbspserver holds another map
 
 
 Licenses
 --------
 ericw-tools is GPL v3 (licenses\ericw-tools-gpl_v3.txt); oneTBB is
-Apache 2.0 (licenses\tbb-LICENSE.txt). The source code of this build,
-qbspserver included, is in the repository this release comes from.
+Apache 2.0 (licenses\tbb-LICENSE.txt). The source code is at
+https://github.com/teiman/qbspserver

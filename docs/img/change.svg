@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="290" viewBox="0 0 820 290" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#666"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="820" height="290" rx="14" fill="#ffffff" stroke="#d0d7de"/>
+
+  <!-- before -->
+  <text x="28" y="44" font-size="15" font-weight="600" fill="#24292f">Your compile today</text>
+  <rect x="200" y="22" width="150" height="40" rx="8" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.5"/>
+  <text x="275" y="47" text-anchor="middle" font-size="15" fill="#24292f">qbsp</text>
+  <path d="M350,42 L392,42" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="396" y="22" width="150" height="40" rx="8" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.5"/>
+  <text x="471" y="47" text-anchor="middle" font-size="15" fill="#24292f">vis</text>
+  <path d="M546,42 L588,42" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="592" y="22" width="150" height="40" rx="8" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.5"/>
+  <text x="667" y="47" text-anchor="middle" font-size="15" fill="#24292f">light</text>
+
+  <line x1="28" y1="92" x2="792" y2="92" stroke="#eaeef2"/>
+
+  <!-- after -->
+  <text x="28" y="134" font-size="15" font-weight="600" fill="#24292f">With qbspserver</text>
+  <rect x="200" y="112" width="150" height="40" rx="8" fill="#e9f7ef" stroke="#2f9e5b" stroke-width="2"/>
+  <text x="275" y="137" text-anchor="middle" font-size="15" font-weight="600" fill="#155d33">qbspreceive</text>
+  <path d="M350,132 L392,132" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="396" y="112" width="150" height="40" rx="8" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.5"/>
+  <text x="471" y="137" text-anchor="middle" font-size="15" fill="#24292f">vis</text>
+  <path d="M546,132 L588,132" stroke="#666" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="592" y="112" width="150" height="40" rx="8" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.5"/>
+  <text x="667" y="137" text-anchor="middle" font-size="15" fill="#24292f">light</text>
+  <text x="471" y="172" text-anchor="middle" font-size="12" fill="#57606a">vis and light: unchanged</text>
+
+  <!-- server window -->
+  <rect x="140" y="200" width="270" height="62" rx="8" fill="#ffffff" stroke="#2f9e5b" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="275" y="226" text-anchor="middle" font-size="14" font-weight="600" fill="#155d33">qbspserver</text>
+  <text x="275" y="246" text-anchor="middle" font-size="12" fill="#24543a">a window you open once and leave open</text>
+  <path d="M275,200 L275,158" stroke="#2f9e5b" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#a)"/>
+  <text x="430" y="226" font-size="12" fill="#57606a">it does the qbsp work, and remembers the map</text>
+  <text x="430" y="244" font-size="12" fill="#57606a">between compiles</text>
+</svg>
