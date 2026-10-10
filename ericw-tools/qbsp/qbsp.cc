@@ -907,64 +907,52 @@ static bool IsTrigger(const mapentity_t &entity)
     return trigger_pos == (tex.size() - strlen("trigger"));
 }
 
-// counted locally and added to the stats once per contents: the stats lock a mutex per call
-static void CountLeafs_r(node_t *node, std::unordered_map<contents_t, size_t> &counts)
+// one walk for both statistics: the leaves' contents (counted locally and added to the stats once
+// per contents: the stats lock a mutex per call) and their heights (`height`: the number of nodes
+// from `node` up to the root, both included)
+static void CountLeafs_r(
+    node_t *node, int height, std::unordered_map<contents_t, size_t> &counts, int &max_height, double &sum_height)
 {
     if (auto *leafdata = node->get_leafdata()) {
         counts[leafdata->contents.flags]++;
+        max_height = std::max(max_height, height);
+        sum_height += height;
         return;
     }
 
     auto *nodedata = node->get_nodedata();
-    CountLeafs_r(nodedata->children[0], counts);
-    CountLeafs_r(nodedata->children[1], counts);
+    CountLeafs_r(nodedata->children[0], height + 1, counts, max_height, sum_height);
+    CountLeafs_r(nodedata->children[1], height + 1, counts, max_height, sum_height);
 }
 
-
-// `height`: the number of nodes from `node` up to the root, both included (1 for the root).
-// Counted on the way down: walking up from every leaf cost leaves x depth.
-static void CountLeafHeights_r(node_t *node, int height, std::vector<int> &heights)
-{
-    if (node->is_leaf()) {
-        heights.push_back(height);
-        return;
-    }
-    auto *nodedata = node->get_nodedata();
-    CountLeafHeights_r(nodedata->children[0], height + 1, heights);
-    CountLeafHeights_r(nodedata->children[1], height + 1, heights);
-}
 
 void CountLeafs(node_t *headnode)
 {
     logging::funcheader();
 
-    auto stats = content_stats_t();
-    std::unordered_map<contents_t, size_t> counts;
-    CountLeafs_r(headnode, counts);
-    for (auto &[flags, count] : counts) {
-        stats.count_contents_in_stats(contentflags_t{.flags = flags}, count);
-    }
-    stats.print_content_stats("leafs");
-
-    // count the heights of the tree at each leaf
-    logging::stat_tracker_t stat_print;
-
-    std::vector<int> leaf_heights;
     // headnode may be a subtree (its parent set): heights still count up to the real root
     int height = 1;
     for (const node_t *n = headnode; n->parent; n = n->parent) {
         height++;
     }
-    CountLeafHeights_r(headnode, height, leaf_heights);
 
-    const int max_height = *std::max_element(leaf_heights.begin(), leaf_heights.end());
-    stat_print.register_stat("max tree height").count += max_height;
+    std::unordered_map<contents_t, size_t> counts;
+    int max_height = 0;
+    double sum_height = 0;
+    size_t leafs = 0;
+    CountLeafs_r(headnode, height, counts, max_height, sum_height);
 
-    double avg_height = 0;
-    for (int height : leaf_heights) {
-        avg_height += (height / static_cast<double>(leaf_heights.size()));
+    auto stats = content_stats_t();
+    for (auto &[flags, count] : counts) {
+        stats.count_contents_in_stats(contentflags_t{.flags = flags}, count);
+        leafs += count;
     }
-    stat_print.register_stat("avg tree height").count += static_cast<int>(avg_height);
+    stats.print_content_stats("leafs");
+
+    // the heights of the tree at each leaf
+    logging::stat_tracker_t stat_print;
+    stat_print.register_stat("max tree height").count += max_height;
+    stat_print.register_stat("avg tree height").count += static_cast<int>(sum_height / leafs);
 }
 
 static void GatherBspbrushes_r(node_t *node, bspbrush_t::container &container)
@@ -1325,7 +1313,13 @@ static void ProcessEntity(mapentity_t &entity, hull_index_t hullnum)
 
     } // !hull0_reuse
 
-    MakeTreePortals(tree);
+    // The world's portals were made for this very tree just before its filling, and filling only
+    // changes leaf contents (portals only depend on the tree's planes): don't make them again.
+    // (Brush entities rebuilt their tree; Q2's area portals are left as they were.)
+    if (!map.is_world_entity(entity) || tree.portaltype != portaltype_t::TREE ||
+        qbsp_options.target_game->id == GAME_QUAKE_II) {
+        MakeTreePortals(tree);
+    }
 
     MarkVisibleSides(tree, brushes);
     MakeFaces(tree.headnode);
