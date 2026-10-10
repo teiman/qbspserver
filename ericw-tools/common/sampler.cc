@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <atomic>
 #include <map>
+#include <set>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -39,11 +40,41 @@
 namespace sampler
 {
 #ifdef _WIN32
+// Each sample is a call stack: [depth, ip, return address, ...]. The buffer is preallocated: nothing
+// may be allocated while a thread is stopped (it could hold the heap's lock).
+constexpr size_t max_frames = 32;
+constexpr size_t record_size = max_frames + 1;
 static std::atomic<bool> running = false;
 static std::thread thread;
-static std::vector<uint64_t> samples; // instruction pointers, preallocated: no allocation while a thread is stopped
+static std::vector<uint64_t> samples;
 static std::atomic<size_t> count = 0;
 static std::atomic<size_t> lost = 0;
+
+// Walks the stack of a stopped thread with the unwind data of its modules (no allocation). A bad
+// stack (a thread stopped in the middle of something odd) ends the walk instead of crashing.
+static size_t unwind(CONTEXT ctx, uint64_t *frames)
+{
+    size_t depth = 0;
+    __try {
+        while (depth < max_frames && ctx.Rip) {
+            frames[depth++] = ctx.Rip;
+            DWORD64 image_base = 0;
+            PRUNTIME_FUNCTION function = RtlLookupFunctionEntry(ctx.Rip, &image_base, nullptr);
+            if (!function) {
+                // a leaf function: the return address is on top of the stack
+                ctx.Rip = *reinterpret_cast<DWORD64 *>(ctx.Rsp);
+                ctx.Rsp += 8;
+            } else {
+                PVOID handler_data = nullptr;
+                DWORD64 establisher_frame = 0;
+                RtlVirtualUnwind(UNW_FLAG_NHANDLER, image_base, ctx.Rip, function, &ctx, &handler_data,
+                    &establisher_frame, nullptr);
+            }
+        }
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+    return depth;
+}
 
 static void loop()
 {
@@ -53,6 +84,7 @@ static void loop()
     std::unordered_map<DWORD, HANDLE> handles;
     std::vector<HANDLE> active;
     auto last_scan = GetTickCount64() - 1000;
+    const size_t capacity = samples.size() / record_size;
 
     while (running) {
         // the thread list, now and then (this allocates: no thread is stopped meanwhile)
@@ -85,18 +117,19 @@ static void loop()
                 continue;
             }
             CONTEXT ctx{};
-            ctx.ContextFlags = CONTEXT_CONTROL;
-            const BOOL ok = GetThreadContext(h, &ctx);
-            ResumeThread(h);
-            if (!ok) {
+            ctx.ContextFlags = CONTEXT_FULL;
+            if (!GetThreadContext(h, &ctx)) {
+                ResumeThread(h);
                 continue;
             }
             const size_t i = count.fetch_add(1);
-            if (i < samples.size()) {
-                samples[i] = ctx.Rip;
+            if (i < capacity) {
+                uint64_t *record = &samples[i * record_size];
+                record[0] = unwind(ctx, record + 1);
             } else {
                 lost++;
             }
+            ResumeThread(h);
         }
         Sleep(1);
     }
@@ -113,12 +146,19 @@ void start()
     if (running) {
         return;
     }
-    samples.assign(size_t(32) << 20, 0); // 32M samples: ~30 min at 16 threads
+    samples.assign(size_t(400000) * record_size, 0); // 400k stacks (~100 MB)
     count = 0;
     lost = 0;
     running = true;
     thread = std::thread(loop);
 }
+
+struct symbol_t
+{
+    std::string function; // "[module]" without debug info
+    std::string line; // "file:line", or empty
+    bool ours; // in the program itself (not the system, the C runtime or TBB)
+};
 
 std::string stop_and_report(size_t top)
 {
@@ -128,74 +168,143 @@ std::string stop_and_report(size_t top)
     running = false;
     thread.join();
 
-    const size_t n = std::min<size_t>(count, samples.size());
+    const size_t n = std::min<size_t>(count, samples.size() / record_size);
     HANDLE proc = GetCurrentProcess();
     SymSetOptions(SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
     SymInitialize(proc, nullptr, TRUE);
 
-    // by function and by source line
-    std::unordered_map<uint64_t, size_t> by_ip;
-    for (size_t i = 0; i < n; i++) {
-        by_ip[samples[i]]++;
-    }
-    std::map<std::string, size_t> by_function, by_line;
-    size_t idle = 0;
-    alignas(SYMBOL_INFO) char buffer[sizeof(SYMBOL_INFO) + 512];
-    for (auto &[ip, c] : by_ip) {
+    char exe_path[MAX_PATH] = "";
+    GetModuleFileNameA(nullptr, exe_path, MAX_PATH);
+    const HMODULE exe = GetModuleHandleA(nullptr);
+
+    std::unordered_map<uint64_t, symbol_t> symbols;
+    auto symbol = [&](uint64_t ip) -> const symbol_t & {
+        auto [it, inserted] = symbols.try_emplace(ip);
+        if (!inserted) {
+            return it->second;
+        }
+        symbol_t &s = it->second;
+        HMODULE module = nullptr;
+        GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            reinterpret_cast<LPCSTR>(ip), &module);
+        s.ours = module == exe;
+        alignas(SYMBOL_INFO) char buffer[sizeof(SYMBOL_INFO) + 512];
         auto *info = reinterpret_cast<SYMBOL_INFO *>(buffer);
         info->SizeOfStruct = sizeof(SYMBOL_INFO);
         info->MaxNameLen = 511;
         DWORD64 displacement = 0;
-        std::string function;
         if (SymFromAddr(proc, ip, &displacement, info)) {
-            function = info->Name;
+            s.function = info->Name;
         } else {
-            char module[MAX_PATH] = "?";
-            HMODULE hm = nullptr;
-            if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                    reinterpret_cast<LPCSTR>(ip), &hm)) {
-                GetModuleFileNameA(hm, module, MAX_PATH);
+            char name[MAX_PATH] = "?";
+            if (module) {
+                GetModuleFileNameA(module, name, MAX_PATH);
             }
-            std::string m = module;
-            function = "[" + m.substr(m.find_last_of("\\/") + 1) + "]";
+            std::string m = name;
+            s.function = "[" + m.substr(m.find_last_of("\\/") + 1) + "]";
         }
-        // a thread waiting for work isn't working: leave it out
-        if (function.find("Wait") != std::string::npos || function.find("DelayExecution") != std::string::npos ||
-            function.find("is_tbbmalloc_used") != std::string::npos) { // (tbb12.dll's spin loop, mis-named)
-            idle += c;
-            continue;
-        }
-        by_function[function] += c;
-
         IMAGEHLP_LINE64 line{};
         line.SizeOfStruct = sizeof(line);
         DWORD line_displacement = 0;
         if (SymGetLineFromAddr64(proc, ip, &line_displacement, &line)) {
             std::string file = line.FileName;
-            file = file.substr(file.find_last_of("\\/") + 1);
-            by_line[fmt::format("{}:{} ({})", file, line.LineNumber, function)] += c;
+            s.line = fmt::format("{}:{}", file.substr(file.find_last_of("\\/") + 1), line.LineNumber);
+        }
+        return s;
+    };
+
+    auto is_idle = [](const std::string &f) {
+        // a thread waiting for work isn't working ("is_tbbmalloc_used": tbb12.dll's spin loop, mis-named)
+        return f.find("Wait") != std::string::npos || f.find("DelayExecution") != std::string::npos ||
+               f.find("is_tbbmalloc_used") != std::string::npos;
+    };
+    auto is_memory = [](const symbol_t &s) {
+        // the heap, tbbmalloc, the C runtime's malloc / free and new / delete
+        static const char *names[] = {"AllocateHeap", "FreeHeap", "ReAllocateHeap", "RtlpHeap", "RtlpLowFrag",
+            "tbbmalloc", "scalable_", "malloc", "free", "operator new", "operator delete", "_aligned_", "calloc",
+            "realloc", "[ntdll.dll]", "[ucrtbase.dll]"};
+        for (auto *name : names) {
+            if (s.function.find(name) != std::string::npos) {
+                return true;
+            }
+        }
+        return false;
+    };
+    // the caller to blame for an allocation: the first frame in the program that isn't the standard
+    // library's or an allocator's own code
+    auto is_plumbing = [](const std::string &f) {
+        return f.starts_with("std::") || f.starts_with("operator ") || f.starts_with("tbb::") ||
+               f.find("allocator") != std::string::npos || f.starts_with("_") || f.starts_with("polylib::winding_storage");
+    };
+
+    std::map<std::string, size_t> by_function, by_line, inclusive, memory_callers, memory_lines;
+    size_t idle = 0, memory = 0;
+    std::set<std::string> seen;
+    for (size_t i = 0; i < n; i++) {
+        const uint64_t *record = &samples[i * record_size];
+        const size_t depth = record[0];
+        if (!depth) {
+            continue;
+        }
+        const symbol_t &leaf = symbol(record[1]);
+        if (is_idle(leaf.function)) {
+            idle++;
+            continue;
+        }
+        by_function[leaf.function]++;
+        if (!leaf.line.empty()) {
+            by_line[leaf.line + " (" + leaf.function + ")"]++;
+        }
+        seen.clear();
+        bool in_memory = false;
+        for (size_t d = 0; d < depth; d++) {
+            const symbol_t &s = symbol(record[1 + d]);
+            seen.insert(s.function);
+            if (d < 6 && is_memory(s)) {
+                in_memory = true;
+            }
+        }
+        for (auto &f : seen) {
+            inclusive[f]++;
+        }
+        if (in_memory) {
+            memory++;
+            for (size_t d = 0; d < depth; d++) {
+                const symbol_t &s = symbol(record[1 + d]);
+                if (s.ours && !is_plumbing(s.function)) {
+                    memory_callers[s.function]++;
+                    memory_lines[(s.line.empty() ? std::string("?") : s.line) + " (" + s.function + ")"]++;
+                    break;
+                }
+            }
         }
     }
     SymCleanup(proc);
 
-    auto print_top = [&](const char *title, const std::map<std::string, size_t> &m) {
+    const size_t busy = n - idle;
+    auto print_top = [&](const std::string &title, const std::map<std::string, size_t> &m, size_t lines) {
         std::vector<std::pair<size_t, std::string>> v;
         for (auto &[k, c] : m) {
             v.emplace_back(c, k);
         }
         std::sort(v.begin(), v.end(), std::greater<>());
         std::string out = fmt::format("---- {} ----\n", title);
-        for (size_t i = 0; i < v.size() && i < top; i++) {
-            out += fmt::format("  {:6.2f}%  {:8}  {}\n", 100.0 * v[i].first / std::max<size_t>(n - idle, 1),
-                v[i].first, v[i].second.substr(0, 160));
+        for (size_t i = 0; i < v.size() && i < lines; i++) {
+            out += fmt::format("  {:6.2f}%  {:8}  {}\n", 100.0 * v[i].first / std::max<size_t>(busy, 1), v[i].first,
+                v[i].second.substr(0, 160));
         }
         return out;
     };
     std::string out = fmt::format("\n==== SAMPLES: {} ({} lost), all threads, ~1 ms apart; {} busy ({:.0f}%), "
                                   "percentages of the busy ones ====\n",
-        n, lost.load(), n - idle, 100.0 * (n - idle) / std::max<size_t>(n, 1));
-    out += print_top("by function", by_function);
-    out += print_top("by source line", by_line);
+        n, lost.load(), busy, 100.0 * busy / std::max<size_t>(n, 1));
+    out += print_top("by function", by_function, top);
+    out += print_top("by source line", by_line, top);
+    out += print_top("inclusive (the function or what it calls)", inclusive, top);
+    out += print_top(fmt::format("memory (allocating / freeing: {:.1f}% of busy), by the caller in the program",
+                         100.0 * memory / std::max<size_t>(busy, 1)),
+        memory_callers, top);
+    out += print_top("memory, by the caller's line", memory_lines, top);
     return out;
 }
 #else
