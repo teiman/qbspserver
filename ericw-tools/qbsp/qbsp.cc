@@ -1840,6 +1840,11 @@ void ProcessFile()
         return;
     }
 
+    // qbspserver: only point entities changed, in the same areas (see hullcache.hh)
+    if (hullcache::entities_only()) {
+        return;
+    }
+
     // handle load time operation on the .map
     ProcessMapBrushes();
 
@@ -1858,6 +1863,7 @@ void ProcessFile()
     WriteEntitiesToString();
     BSPX_CreateBrushList();
     FinishBSPFile();
+    hullcache::remember_full_output();
 }
 
 /*

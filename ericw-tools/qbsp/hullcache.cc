@@ -29,6 +29,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -924,6 +925,8 @@ struct hull0_t
 static std::unordered_multimap<key_t, hull0_t, key_hash> hull0_trees;
 // the first pass's tree of the compile in progress, until hull0_store()
 static std::unique_ptr<hull0_t> hull0_pending;
+// the key of the world's tree the last compile stored or reused (for entities_only)
+static std::optional<key_t> world_hull0_key;
 
 static size_t hull0_bmodels_reused = 0;
 
@@ -1113,6 +1116,9 @@ void hull0_store(tree_t &tree, mapentity_t &entity, const std::vector<std::share
     });
 
     t->last_used = generation;
+    if (!bmodel) {
+        world_hull0_key = t->key;
+    }
     auto [first, last] = hull0_trees.equal_range(t->key);
     for (auto it = first; it != last;) {
         it = it->second.shapes == t->shapes ? hull0_trees.erase(it) : std::next(it);
@@ -1203,6 +1209,7 @@ bool hull0_reuse(tree_t &tree, mapentity_t &entity, const std::vector<std::share
             }
             hull0_bmodels_reused++;
         } else {
+            world_hull0_key = key;
             logging::print("hull 0: world tree reused from a previous compile ({} nodes, {} leafs)\n",
                 t.nodes.size(), t.leaves.size());
         }
@@ -1737,6 +1744,149 @@ void cell_portals_done()
     }
     portal_cells_reused = portal_cells_built = 0;
     portal_cells.clear();
+}
+
+// ---- entities-only compiles ----------------------------------------------------------------
+
+static uint64_t current_skeleton = 0;
+static struct
+{
+    uint64_t skeleton = 0;
+    std::string bsp, prt; // as written
+    bool has_prt = false;
+    // the final keys of the world and of every entity with brushes, in map order
+    std::vector<entdict_t> brush_entity_keys;
+} last_full;
+
+void set_map_skeleton(uint64_t skeleton)
+{
+    current_skeleton = skeleton;
+}
+
+static bool has_brush_keys(const mapentity_t &entity)
+{
+    // (an entity without brushes keeps the keys it was loaded with: ProcessEntity skips it)
+    return map.is_world_entity(entity) || !entity.mapbrushes.empty();
+}
+
+static bool read_whole_file(const fs::path &path, std::string &out)
+{
+    std::ifstream f(path, std::ios::binary);
+    if (!f) {
+        return false;
+    }
+    out.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
+    return true;
+}
+
+void remember_full_output()
+{
+    last_full = {};
+    if (!is_enabled) {
+        return;
+    }
+    fs::path bsp_path = qbsp_options.bsp_path;
+    if (!read_whole_file(bsp_path.replace_extension("bsp"), last_full.bsp)) {
+        return;
+    }
+    last_full.has_prt = read_whole_file(fs::path(bsp_path).replace_extension("prt"), last_full.prt);
+    for (auto &entity : map.entities) {
+        if (has_brush_keys(entity)) {
+            last_full.brush_entity_keys.push_back(entity.epairs);
+        }
+    }
+    last_full.skeleton = current_skeleton;
+}
+
+void adopt_map_skeleton(uint64_t skeleton)
+{
+    if (!last_full.bsp.empty()) {
+        last_full.skeleton = skeleton;
+    }
+}
+
+// what the last compile used stays as used by this one (an entities-only compile builds nothing)
+static void touch_previous()
+{
+    for (auto &[k, e] : entries) {
+        if (e.last_used + 1 == generation) {
+            e.last_used = generation;
+        }
+    }
+    for (auto &[hull, stored] : cells) {
+        for (auto &[k, c] : stored) {
+            if (c.last_used + 1 == generation) {
+                c.last_used = generation;
+            }
+        }
+    }
+    for (auto &[k, t] : hull0_trees) {
+        if (t.last_used + 1 == generation) {
+            t.last_used = generation;
+        }
+    }
+}
+
+bool entities_only()
+{
+    static const bool disabled = std::getenv("QBSPSERVER_NO_ENTITIES_ONLY") != nullptr;
+    if (!is_enabled || disabled || !current_skeleton || current_skeleton != last_full.skeleton) {
+        return false;
+    }
+
+    // the world's hull 0 tree of the last compile (built or reused then: brushes unchanged since;
+    // its key, computed by ProcessEntity, can't be computed yet here)
+    hull0_t *world = nullptr;
+    auto [first, last] = world_hull0_key ? hull0_trees.equal_range(*world_hull0_key)
+                                         : std::make_pair(hull0_trees.end(), hull0_trees.end());
+    for (auto it = first; it != last; ++it) {
+        if (!it->second.bmodel && it->second.last_used + 1 == generation) {
+            world = &it->second;
+        }
+    }
+    if (!world) {
+        logging::print("qbspserver: only point entities changed, but the last compile's hull 0 isn't stored: full compile\n");
+        return false;
+    }
+    std::vector<int32_t> outside, detail;
+    occupied_areas(*world, outside, detail);
+    if (outside != world->occupied_outside || detail != world->occupied_detail) {
+        logging::print("qbspserver: only point entities changed, but they occupy other areas: full compile\n");
+        return false;
+    }
+    size_t count = 0;
+    for (auto &entity : map.entities) {
+        count += has_brush_keys(entity);
+    }
+    if (count != last_full.brush_entity_keys.size()) {
+        return false;
+    }
+
+    logging::header("hullcache::entities_only");
+    logging::print("qbspserver: only point entities changed, in the same areas: the last output with new entities\n");
+    size_t i = 0;
+    for (auto &entity : map.entities) {
+        if (has_brush_keys(entity)) {
+            entity.epairs = last_full.brush_entity_keys[i++];
+        }
+    }
+    WriteEntitiesToString();
+
+    fs::path bsp_path = qbsp_options.bsp_path;
+    bsp_path.replace_extension("bsp");
+    {
+        std::ofstream f(bsp_path, std::ios::binary);
+        f.write(last_full.bsp.data(), last_full.bsp.size());
+    }
+    UpdateBSPFileEntitiesLump();
+    fs::path prt_path = fs::path(bsp_path).replace_extension("prt");
+    if (last_full.has_prt) {
+        std::ofstream f(prt_path, std::ios::binary);
+        f.write(last_full.prt.data(), last_full.prt.size());
+    }
+
+    touch_previous();
+    return true;
 }
 
 void print_summary()

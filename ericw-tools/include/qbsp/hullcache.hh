@@ -191,6 +191,25 @@ void hull0_store_first(tree_t &tree);
 // after hull 0's final tree and its portals, before its filling: store both trees
 void hull0_store(tree_t &tree, mapentity_t &entity, const std::vector<std::shared_ptr<bspbrush_t>> &brushes);
 
+/*
+ * Entities-only compiles: when the only difference from the last compile is in point entities
+ * (the server compares the map's text without them, see qbspserver/server.cc), every brush, tree
+ * and face is the same, except for one thing: the filling keeps the areas of empty space that hold
+ * a point entity. If the point entities occupy the same set of areas (placed in the stored first
+ * tree of the world's hull 0, as for hull0_reuse), the filling is the same too, and the output is
+ * the last full compile's with a new entities lump (like qbsp -onlyents, but proven safe). The
+ * entities with brushes get back the keys the full compile gave them ("model" etc.).
+ * QBSPSERVER_NO_ENTITIES_ONLY=1 turns it off (to compare).
+ */
+// before the compile: a hash of the map without its point entities (and of the wads), 0 = unknown
+void set_map_skeleton(uint64_t skeleton);
+// after LoadMapFile: writes the output and returns true if this compile is entities-only
+bool entities_only();
+// at the end of a successful full compile: keep its output for entities-only compiles
+void remember_full_output();
+// the server's first compile runs before it knows the map's skeleton: given afterwards
+void adopt_map_skeleton(uint64_t skeleton);
+
 // one line per compile: hulls reused / rebuilt
 void print_summary();
 } // namespace hullcache

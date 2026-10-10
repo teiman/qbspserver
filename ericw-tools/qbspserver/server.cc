@@ -256,6 +256,77 @@ static bool output_up_to_date(const fs::path &map_path, const std::string &map_b
     return true;
 }
 
+/*
+ * The map without its point entities: the text of the world and of every entity with brushes,
+ * in order, and the stamps of the wads the last compile read. When it's the same as at the last
+ * compile, only point entities changed (hullcache::entities_only checks the rest). 0 when unsure.
+ */
+static uint64_t map_skeleton(const std::string &map_bytes)
+{
+    if (!last_output.valid || map_bytes.find("misc_external_map") != std::string::npos) {
+        return 0;
+    }
+    // the wads (the .bsp, files[0], may have been through light / vis since: it doesn't matter)
+    for (size_t i = 1; i < last_output.files.size(); i++) {
+        if (stamp(last_output.files[i].path) != last_output.files[i]) {
+            return 0;
+        }
+    }
+
+    uint64_t h = 1469598103934665603ull; // FNV-1a
+    auto add = [&h](std::string_view s) {
+        for (unsigned char c : s) {
+            h = (h ^ c) * 1099511628211ull;
+        }
+        h = (h ^ 0xff) * 1099511628211ull; // separator
+    };
+    for (size_t i = 1; i < last_output.files.size(); i++) {
+        add(last_output.files[i].path.string());
+    }
+
+    // top-level { } blocks; a block inside one is a brush (or a patch)
+    size_t depth = 0, entity_start = 0, entities = 0;
+    bool in_quote = false, has_brushes = false;
+    for (size_t i = 0; i < map_bytes.size(); i++) {
+        const char c = map_bytes[i];
+        if (in_quote) {
+            in_quote = c != '"' && c != '\n';
+            continue;
+        }
+        if (c == '"') {
+            in_quote = true;
+        } else if (c == '/' && i + 1 < map_bytes.size() && map_bytes[i + 1] == '/') {
+            // (a comment inside an entity stays in its text: compared like the rest)
+            const size_t eol = map_bytes.find('\n', i);
+            i =(eol == std::string::npos) ? map_bytes.size() : eol;
+        } else if (c == '{') {
+            if (depth == 0) {
+                entity_start = i;
+                has_brushes = false;
+            } else if (depth == 1) {
+                has_brushes = true;
+            }
+            depth++;
+        } else if (c == '}') {
+            if (depth == 0) {
+                return 0; // unbalanced: let qbsp report it
+            }
+            if (--depth == 0) {
+                // (point entities left out: adding, removing or reordering them doesn't change the
+                // brush entities' order, so not their model numbers)
+                if (entities == 0 || has_brushes) {
+                    add(std::string_view(map_bytes).substr(entity_start, i + 1 - entity_start));
+                }
+                entities++;
+            }
+        }
+    }
+    if (depth != 0 || in_quote) {
+        return 0;
+    }
+    return h ? h : 1;
+}
+
 static bool same_file(const fs::path &a, const fs::path &b)
 {
     std::error_code ec;
@@ -328,6 +399,7 @@ static void serve(net::socket &client, const std::vector<std::string> &args, con
             stream.push(str);
         });
 
+        hullcache::set_map_skeleton(map_skeleton(map_bytes));
         code = compile(args);
         remember_output(map_path, std::move(map_bytes), code == net::EXIT_OK);
 
@@ -388,6 +460,7 @@ static int qbspserver_main(int argc, const char **argv)
     }
 
     // first compile; also parses the qbsp options and finds the map
+    const auto first_compile_start = fs::file_time_type::clock::now();
     int code = compile(args);
 
     fs::path map_path = qbsp_options.map_path;
@@ -395,6 +468,16 @@ static int qbspserver_main(int argc, const char **argv)
         return 1;
     }
     map_path = fs::absolute(map_path).lexically_normal();
+
+    // what it compiled, for the shortcuts of the next request (unless the map was saved meanwhile:
+    // then the bytes read now aren't the ones compiled)
+    if (code == net::EXIT_OK) {
+        if (auto s = stamp(map_path); s && s->time < first_compile_start) {
+            std::string map_bytes = read_file(map_path);
+            remember_output(map_path, map_bytes, true);
+            hullcache::adopt_map_skeleton(map_skeleton(map_bytes));
+        }
+    }
 
     logging::print("\nqbspserver: first compile done ({})\n", code);
     logging::print("qbspserver: holding {}\n", map_path.string());
