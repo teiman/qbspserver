@@ -1085,22 +1085,49 @@ static side_t *SelectSplitPlane(
     // for the node: looping over every side of every brush for every candidate plane made a node
     // cost (number of sides)^2. Same answer as that loop: the brush's first side on the plane, in
     // either direction, decides.
-    std::unordered_map<size_t, std::vector<std::pair<uint32_t, int>>> facing_index;
+    // One vector sorted by plane, then brush (a plane's brushes in increasing order), looked up by
+    // binary search: a hash map of vectors per node was ~5% of qbsp's time in allocations.
+    struct facing_t
     {
-        std::vector<size_t> seen;
+        size_t plane; // positive planenum
+        uint32_t brush;
+        int result; // TestBrushToPlanenum's answer for that brush
+    };
+    std::vector<facing_t> facing_index;
+    {
+        size_t total = 0;
+        for (auto &b : brushes) {
+            total += b->sides.size();
+        }
+        facing_index.reserve(total);
         for (uint32_t i = 0; i < brushes.size(); i++) {
-            seen.clear();
-            for (auto &side : brushes[i]->sides) {
-                const size_t key = side.planenum & ~1;
-                if (std::find(seen.begin(), seen.end(), key) != seen.end()) {
-                    continue;
+            const auto &sides = brushes[i]->sides;
+            for (size_t j = 0; j < sides.size(); j++) {
+                const size_t key = sides[j].planenum & ~1;
+                bool first = true; // (only the brush's first side on the plane counts)
+                for (size_t k = 0; k < j && first; k++) {
+                    first = (sides[k].planenum & ~1) != key;
                 }
-                seen.push_back(key);
-                facing_index[key].emplace_back(
-                    i, side.planenum == key ? (PSIDE_BACK | PSIDE_FACING) : (PSIDE_FRONT | PSIDE_FACING));
+                if (first) {
+                    facing_index.push_back(
+                        {key, i, sides[j].planenum == key ? (PSIDE_BACK | PSIDE_FACING) : (PSIDE_FRONT | PSIDE_FACING)});
+                }
             }
         }
+        std::sort(facing_index.begin(), facing_index.end(), [](const facing_t &a, const facing_t &b) {
+            return a.plane != b.plane ? a.plane < b.plane : a.brush < b.brush;
+        });
     }
+    // the brushes with a side on `plane`, in increasing brush order
+    auto facing_range = [&](size_t plane) -> std::pair<const facing_t *, const facing_t *> {
+        auto first = std::lower_bound(facing_index.begin(), facing_index.end(), plane,
+            [](const facing_t &f, size_t p) { return f.plane < p; });
+        auto last = first;
+        while (last != facing_index.end() && last->plane == plane) {
+            ++last;
+        }
+        return {facing_index.data() + (first - facing_index.begin()), facing_index.data() + (last - facing_index.begin())};
+    };
     // the brushes' bounds, contiguous: every candidate tests every brush's box
     std::vector<aabb3d> boxes;
     boxes.reserve(brushes.size());
@@ -1121,11 +1148,7 @@ static side_t *SelectSplitPlane(
         bool hintsplit = false;
 
         // the brushes with a side on the plane, in increasing brush order
-        const std::vector<std::pair<uint32_t, int>> *facing_list = nullptr;
-        if (auto it = facing_index.find(positive_planenum); it != facing_index.end()) {
-            facing_list = &it->second;
-        }
-        size_t next_facing = 0;
+        auto [next_facing, facing_end] = facing_range(positive_planenum);
 
         // TestBrushToPlanenum, inlined: a brush with a side on the plane faces it, else its box decides,
         // and a brush on both sides counts the visible faces it would split
@@ -1138,8 +1161,8 @@ static side_t *SelectSplitPlane(
             // (TestBrushToPlanenum clears it for every brush, so only the last brush decides)
             hintsplit = false;
             int s;
-            if (facing_list && next_facing < facing_list->size() && (*facing_list)[next_facing].first == ti) {
-                s = (*facing_list)[next_facing++].second;
+            if (next_facing != facing_end && next_facing->brush == ti) {
+                s = (next_facing++)->result;
                 facing++;
             } else {
                 if (axial) {
@@ -1233,12 +1256,10 @@ static side_t *SelectSplitPlane(
 
                 // if a brush shares this face, don't bother
                 // testing that facenum as a splitter again
-                if (auto it = facing_index.find(positive_planenum); it != facing_index.end()) {
-                    for (auto &[i, result] : it->second) {
-                        for (auto &testside : brushes[i]->sides) {
-                            if ((testside.planenum & ~1) == positive_planenum) {
-                                testside.tested = true;
-                            }
+                for (auto [f, end] = facing_range(positive_planenum); f != end; ++f) {
+                    for (auto &testside : brushes[f->brush]->sides) {
+                        if ((testside.planenum & ~1) == positive_planenum) {
+                            testside.tested = true;
                         }
                     }
                 }
