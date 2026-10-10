@@ -424,6 +424,7 @@ struct leafdata_t
     contentflags_t contents; // leaf nodes (0 for decision nodes)
     std::vector<bspbrush_t *> original_brushes;
     bspbrush_t::container bsp_brushes;
+    int32_t hullcache_index; // qbspserver: scratch, while hullcache records the tree
 };
 
 struct node_t

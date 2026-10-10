@@ -66,6 +66,17 @@ struct tree_t
 
     // reset the tree without clearing allocated vector space
     void clear();
+
+    // (the nodes are freed on another thread, see FreeNodesLater)
+    tree_t() = default;
+    ~tree_t();
+    tree_t(const tree_t &) = delete;
+    tree_t &operator=(const tree_t &) = delete;
 };
+
+// Freeing a tree's nodes (millions of them in a big map's clipping hulls, with their brush
+// fragments) took seconds: clear() and ~tree_t() hand them to a background task, which frees
+// them while qbsp goes on (nothing points into a discarded tree). This waits for those tasks.
+void WaitForDeferredFrees();
 
 void PruneNodes(node_t *node);

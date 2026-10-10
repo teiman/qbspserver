@@ -184,15 +184,30 @@ static bool HasTJuncInteraction(const face_t *f1, const face_t *f2)
 }
 
 /*
-==========
-FindEdgeVerts_FaceBounds_R
+ * The vertices near an edge: those of the faces (with a T-junction interaction with `f`) on the
+ * nodes whose bounds touch a loose box around the edge, in a depth-first descent of the tree.
+ *
+ * One descent per face instead of one per edge: every edge's box is inside the face's box, so
+ * the nodes an edge's descent visits are among those the face's box visits, and the vertices it
+ * keeps among theirs. The face's descent records its nodes in the
+ * same (depth-first) order with their parent, and each node's interacting vertices inside the
+ * face's box; an edge then keeps the nodes not disjoint from its box whose parent it kept, and
+ * their vertices inside its box: the same vertices, in the same order, as its own descent.
+ */
+struct face_query_t
+{
+    struct node_entry_t
+    {
+        const node_t *node;
+        int32_t parent;
+        uint32_t verts_begin, verts_end;
+    };
+    std::vector<node_entry_t> nodes;
+    std::vector<size_t> verts;
+    std::vector<char> kept;
+};
 
-Recursive function for matching nodes that intersect the aabb
-for vertex checking.
-==========
-*/
-static void FindEdgeVerts_FaceBounds_R(
-    const node_t *node, const face_t *f, const aabb3d &aabb, std::vector<size_t> &verts)
+static void FaceQuery_R(const node_t *node, int32_t parent, const face_t *f, const aabb3d &aabb, face_query_t &q)
 {
     if (node->is_leaf()) {
         return;
@@ -201,37 +216,44 @@ static void FindEdgeVerts_FaceBounds_R(
     }
 
     auto *nodedata = node->get_nodedata();
+    const int32_t index = static_cast<int32_t>(q.nodes.size());
+    const uint32_t verts_begin = static_cast<uint32_t>(q.verts.size());
     for (auto &face : nodedata->facelist) {
         if (!HasTJuncInteraction(f, face.get()))
             continue;
         for (auto &v : face->original_vertices) {
             if (aabb.containsPoint(map.bsp.dvertexes[v])) {
-                verts.push_back(v);
+                q.verts.push_back(v);
             }
         }
     }
+    q.nodes.push_back({node, parent, verts_begin, static_cast<uint32_t>(q.verts.size())});
 
-    FindEdgeVerts_FaceBounds_R(nodedata->children[0], f, aabb, verts);
-    FindEdgeVerts_FaceBounds_R(nodedata->children[1], f, aabb, verts);
+    FaceQuery_R(nodedata->children[0], index, f, aabb, q);
+    FaceQuery_R(nodedata->children[1], index, f, aabb, q);
 }
 
-/*
-==========
-FindEdgeVerts_FaceBounds
-
-Use a loose AABB around the line and only capture vertices that intersect it.
-
-f is the face we're fixing; this will affect the candidate other faces
-because not everything has tjunc interactions (e.g. func_detail_wall and worldspawn.)
-==========
-*/
-static void FindEdgeVerts_FaceBounds(
-    const node_t *headnode, const face_t *f, const qvec3d &p1, const qvec3d &p2, std::vector<size_t> &verts)
+static void FindEdgeVerts_FromFaceQuery(face_query_t &q, const qvec3d &p1, const qvec3d &p2, std::vector<size_t> &verts)
 {
-    // magic number, average of "usual" points per edge
-    verts.reserve(8);
+    // a loose box around the edge
+    const aabb3d aabb = (aabb3d{} + p1 + p2).grow(qvec3d(1.0, 1.0, 1.0));
 
-    FindEdgeVerts_FaceBounds_R(headnode, f, (aabb3d{} + p1 + p2).grow(qvec3d(1.0, 1.0, 1.0)), verts);
+    q.kept.assign(q.nodes.size(), 0);
+    for (size_t i = 0; i < q.nodes.size(); i++) {
+        auto &entry = q.nodes[i];
+        if (entry.parent >= 0 && !q.kept[entry.parent]) {
+            continue;
+        }
+        if (entry.node->bounds.disjoint(aabb, 0.0)) {
+            continue;
+        }
+        q.kept[i] = 1;
+        for (uint32_t j = entry.verts_begin; j < entry.verts_end; j++) {
+            if (aabb.containsPoint(map.bsp.dvertexes[q.verts[j]])) {
+                verts.push_back(q.verts[j]);
+            }
+        }
+    }
 }
 
 /*
@@ -310,6 +332,15 @@ static std::vector<size_t> CreateSuperFace(node_t *headnode, face_t *f, tjunc_st
     // stores all of the verts in the world that are close to
     // being on a given edge
     std::vector<size_t> edge_verts;
+    edge_verts.reserve(8);
+
+    // the face's box: it holds every edge's box (see face_query_t)
+    aabb3d face_bounds;
+    for (auto v : f->original_vertices) {
+        face_bounds += qvec3d(map.bsp.dvertexes[v]);
+    }
+    face_query_t query;
+    FaceQuery_R(headnode, -1, f, face_bounds.grow(qvec3d(1.0, 1.0, 1.0)), query);
 
     // find all of the extra vertices that lay on edges,
     // place them in superface
@@ -321,7 +352,7 @@ static std::vector<size_t> CreateSuperFace(node_t *headnode, face_t *f, tjunc_st
         qvec3d v2_pos = map.bsp.dvertexes[v2];
 
         edge_verts.clear();
-        FindEdgeVerts_FaceBounds(headnode, f, v1_pos, v2_pos, edge_verts);
+        FindEdgeVerts_FromFaceQuery(query, v1_pos, v2_pos, edge_verts);
 
         double len;
         qvec3d edge_dir = qv::normalize(v2_pos - v1_pos, len);

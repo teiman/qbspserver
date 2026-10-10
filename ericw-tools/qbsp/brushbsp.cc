@@ -34,6 +34,7 @@
 #include <atomic>
 
 #include "tbb/task_group.h"
+#include "tbb/parallel_for.h"
 #include <qbsp/hullcache.hh>
 #include <algorithm>
 #include <array>
@@ -269,6 +270,9 @@ TestBrushToPlanenum
 */
 // known_facing: -1 = look at the brush's sides; otherwise the caller already knows the result of
 // that loop (0: no side on the plane, or PSIDE_*|PSIDE_FACING), see SelectSplitPlane
+static void CountVisibleSplits(
+    const bspbrush_t &brush, const qbsp_plane_t &plane, int *numsplits, bool *hintsplit, int *epsilonbrush);
+
 static int TestBrushToPlanenum(const bspbrush_t &brush, size_t planenum, int *numsplits, bool *hintsplit,
     int *epsilonbrush, int known_facing = -1)
 {
@@ -301,6 +305,23 @@ static int TestBrushToPlanenum(const bspbrush_t &brush, size_t planenum, int *nu
         return s;
 
     if (numsplits && hintsplit && epsilonbrush) {
+        CountVisibleSplits(brush, plane, numsplits, hintsplit, epsilonbrush);
+    }
+
+    return s;
+}
+
+/*
+==================
+CountVisibleSplits
+
+For a brush on both sides of the plane: count the visible faces split
+==================
+*/
+static void CountVisibleSplits(
+    const bspbrush_t &brush, const qbsp_plane_t &plane, int *numsplits, bool *hintsplit, int *epsilonbrush)
+{
+    {
         // if both sides, count the visible faces split
         double d_front = 0;
         double d_back = 0;
@@ -341,8 +362,6 @@ static int TestBrushToPlanenum(const bspbrush_t &brush, size_t planenum, int *nu
             (*epsilonbrush)++;
         }
     }
-
-    return s;
 }
 
 //========================================================
@@ -1082,9 +1101,84 @@ static side_t *SelectSplitPlane(
             }
         }
     }
-    std::vector<uint32_t> facing_stamp(brushes.size(), 0);
-    std::vector<int> facing_result(brushes.size(), 0);
-    uint32_t candidate = 0;
+    // the brushes' bounds, contiguous: every candidate tests every brush's box
+    std::vector<aabb3d> boxes;
+    boxes.reserve(brushes.size());
+    for (auto &b : brushes) {
+        boxes.push_back(b->bounds);
+    }
+
+    // the value of using `side`'s plane as the splitter (only reads the brushes)
+    auto evaluate = [&](const side_t &side) {
+        const size_t positive_planenum = side.planenum & ~1;
+        const qbsp_plane_t &plane = side.get_positive_plane(); // always use positive facing plane
+
+        int front = 0;
+        int back = 0;
+        int facing = 0;
+        int splits = 0;
+        int epsilonbrush = 0;
+        bool hintsplit = false;
+
+        // the brushes with a side on the plane, in increasing brush order
+        const std::vector<std::pair<uint32_t, int>> *facing_list = nullptr;
+        if (auto it = facing_index.find(positive_planenum); it != facing_index.end()) {
+            facing_list = &it->second;
+        }
+        size_t next_facing = 0;
+
+        // TestBrushToPlanenum, inlined: a brush with a side on the plane faces it, else its box decides,
+        // and a brush on both sides counts the visible faces it would split
+        const bool axial = plane.get_type() < plane_type_t::PLANE_ANYX;
+        const int axis = axial ? static_cast<int>(plane.get_type()) : 0;
+        const double front_dist = plane.get_dist() + PLANESIDE_EPSILON;
+        const double back_dist = plane.get_dist() - PLANESIDE_EPSILON;
+
+        for (size_t ti = 0; ti < brushes.size(); ti++) {
+            // (TestBrushToPlanenum clears it for every brush, so only the last brush decides)
+            hintsplit = false;
+            int s;
+            if (facing_list && next_facing < facing_list->size() && (*facing_list)[next_facing].first == ti) {
+                s = (*facing_list)[next_facing++].second;
+                facing++;
+            } else {
+                if (axial) {
+                    s = 0;
+                    if (boxes[ti].maxs()[axis] > front_dist)
+                        s |= PSIDE_FRONT;
+                    if (boxes[ti].mins()[axis] < back_dist)
+                        s |= PSIDE_BACK;
+                } else {
+                    s = BoxOnPlaneSide(boxes[ti], plane);
+                }
+                if (s == PSIDE_BOTH) {
+                    int bsplits = 0;
+                    CountVisibleSplits(*brushes[ti], plane, &bsplits, &hintsplit, &epsilonbrush);
+                    splits += bsplits;
+                }
+            }
+
+            if (s & PSIDE_FRONT)
+                front++;
+            if (s & PSIDE_BACK)
+                back++;
+        }
+
+        // give a value estimate for using this plane
+
+        int value = 5 * facing - 5 * splits - std::abs(front - back);
+        //					value =  -5*splits;
+        //					value =  5*facing - 5*splits;
+        if (plane.get_type() < plane_type_t::PLANE_ANYX)
+            value += 5; // axial is better
+        value -= epsilonbrush * 1000; // avoid!
+
+        // never split a hint side except with another hint
+        if (hintsplit && !(side.get_texinfo().flags.is_hint()))
+            value = -9999999;
+
+        return value;
+    };
 
     // the search order goes: (changed from q2 tools - see q2_detail_leak_test.map for the issue
     // with the vanilla q2 tools method):
@@ -1096,8 +1190,17 @@ static side_t *SelectSplitPlane(
     //
     // If any valid plane is available in a pass, no further
     // passes will be tried.
+    //
+    // Once a plane is evaluated, every side on it is marked as tested (they all belong to brushes
+    // facing it) and skipped: so a pass evaluates the first side of each plane not evaluated yet,
+    // in brush order. Those evaluations only read the brushes, so on big nodes they run in parallel
+    // (the top of a precise tree, tens of thousands of brushes, took seconds on one thread), and
+    // the first candidate with the best value wins, like the serial loop's `value > bestvalue`.
+    std::vector<side_t *> candidates;
+    std::vector<int> values;
     constexpr int numpasses = 4;
     for (int pass = 0; pass < numpasses; pass++) {
+        candidates.clear();
         for (auto &brush : brushes) {
             // FIXME: these conditions need to be kept in sync with ChooseMidPlaneFromList
             // ideally, should be deduplicated somehow
@@ -1118,7 +1221,6 @@ static side_t *SelectSplitPlane(
                     continue; // only check visible faces on pass 0/2
 
                 size_t positive_planenum = side.planenum & ~1;
-                const qbsp_plane_t &plane = side.get_positive_plane(); // always use positive facing plane
 
                 CheckPlaneAgainstParents(positive_planenum, node);
 
@@ -1127,71 +1229,39 @@ static side_t *SelectSplitPlane(
                     continue; // would produce a tiny volume
 #endif
 
-                int front = 0;
-                int back = 0;
-                int facing = 0;
-                int splits = 0;
-                int epsilonbrush = 0;
-                bool hintsplit = false;
+                candidates.push_back(&side);
 
-                candidate++;
+                // if a brush shares this face, don't bother
+                // testing that facenum as a splitter again
                 if (auto it = facing_index.find(positive_planenum); it != facing_index.end()) {
                     for (auto &[i, result] : it->second) {
-                        facing_stamp[i] = candidate;
-                        facing_result[i] = result;
-                    }
-                }
-
-                for (size_t ti = 0; ti < brushes.size(); ti++) {
-                    auto &test = brushes[ti];
-                    int bsplits;
-                    const int known = facing_stamp[ti] == candidate ? facing_result[ti] : 0;
-                    int s = TestBrushToPlanenum(*test, positive_planenum, &bsplits, &hintsplit, &epsilonbrush, known);
-
-                    splits += bsplits;
-                    if (bsplits && (s & PSIDE_FACING))
-                        Error("PSIDE_FACING with splits");
-
-                    test->testside = s;
-                    // if the brush shares this face, don't bother
-                    // testing that facenum as a splitter again
-                    if (s & PSIDE_FACING) {
-                        facing++;
-                        for (auto &testside : test->sides) {
-                            if ((testside.planenum & ~1) == (side.planenum & ~1)) {
+                        for (auto &testside : brushes[i]->sides) {
+                            if ((testside.planenum & ~1) == positive_planenum) {
                                 testside.tested = true;
                             }
                         }
                     }
-                    if (s & PSIDE_FRONT)
-                        front++;
-                    if (s & PSIDE_BACK)
-                        back++;
                 }
+            }
+        }
 
-                // give a value estimate for using this plane
-
-                int value = 5 * facing - 5 * splits - std::abs(front - back);
-                //					value =  -5*splits;
-                //					value =  5*facing - 5*splits;
-                if (plane.get_type() < plane_type_t::PLANE_ANYX)
-                    value += 5; // axial is better
-                value -= epsilonbrush * 1000; // avoid!
-
-                // never split a hint side except with another hint
-                if (hintsplit && !(side.get_texinfo().flags.is_hint()))
-                    value = -9999999;
-
-                // save off the side test so we don't need
-                // to recalculate it when we actually seperate
-                // the brushes
-                if (value > bestvalue) {
-                    bestvalue = value;
-                    bestside = &side;
-                    for (auto &test : brushes) {
-                        test->side = test->testside;
-                    }
+        values.resize(candidates.size());
+        if (candidates.size() * brushes.size() >= (1 << 20)) {
+            tbb::parallel_for(tbb::blocked_range<size_t>(0, candidates.size()), [&](const tbb::blocked_range<size_t> &r) {
+                for (size_t i = r.begin(); i != r.end(); i++) {
+                    values[i] = evaluate(*candidates[i]);
                 }
+            });
+        } else {
+            for (size_t i = 0; i < candidates.size(); i++) {
+                values[i] = evaluate(*candidates[i]);
+            }
+        }
+
+        for (size_t i = 0; i < candidates.size(); i++) {
+            if (values[i] > bestvalue) {
+                bestvalue = values[i];
+                bestside = candidates[i];
             }
         }
 
@@ -1200,6 +1270,13 @@ static side_t *SelectSplitPlane(
         if (bestside) {
             if (pass >= 2)
                 node->get_nodedata()->detail_separator = true; // not needed for vis
+
+            // save off the side test so we don't need
+            // to recalculate it when we actually seperate
+            // the brushes
+            for (auto &test : brushes) {
+                test->side = TestBrushToPlanenum(*test, bestside->planenum & ~1, nullptr, nullptr, nullptr);
+            }
             break;
         }
     }

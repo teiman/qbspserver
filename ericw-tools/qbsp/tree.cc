@@ -42,14 +42,53 @@ node_t *tree_t::create_node()
     return &(*it);
 }
 
+static tbb::task_group &deferred_frees()
+{
+    static tbb::task_group group;
+    return group;
+}
+
+// the nodes and the portals between them (nothing else points into them any more)
+static void FreeLater(tbb::concurrent_vector<node_t> &nodes, std::deque<portal_t> *portals)
+{
+    if (nodes.empty() && (!portals || portals->empty())) {
+        return;
+    }
+    struct discarded_t
+    {
+        tbb::concurrent_vector<node_t> nodes;
+        std::deque<portal_t> portals;
+    };
+    auto old = std::make_shared<discarded_t>();
+    old->nodes.swap(nodes);
+    if (portals) {
+        old->portals.swap(*portals);
+    }
+    deferred_frees().run([old]() {
+        old->portals.clear();
+        old->nodes.clear();
+    });
+}
+
+void WaitForDeferredFrees()
+{
+    deferred_frees().wait();
+}
+
 void tree_t::clear()
 {
     headnode = nullptr;
     outside_node = {};
     bounds = {};
 
-    FreeTreePortals(*this);
-    nodes.clear();
+    // the whole tree goes: no need to unlink the portals from the nodes first (FreeTreePortals)
+    FreeLater(nodes, &portals);
+    portaltype = portaltype_t::NONE;
+}
+
+tree_t::~tree_t()
+{
+    FreeLater(nodes, &portals);
 }
 
 /*

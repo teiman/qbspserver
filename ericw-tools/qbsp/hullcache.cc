@@ -18,6 +18,7 @@
 #include <qbsp/portals.hh>
 #include <common/log.hh>
 #include <fmt/format.h>
+#include <tbb/task_group.h>
 
 #include <algorithm>
 #include <array>
@@ -1014,28 +1015,31 @@ void hull0_store_first(tree_t &tree)
     if (!is_enabled) {
         return;
     }
+    logging::funcheader();
     auto t = std::make_unique<hull0_t>();
 
-    std::unordered_map<const node_t *, int32_t> leaf_index;
-    std::vector<const node_t *> leaf_nodes;
+    std::vector<node_t *> leaf_nodes;
     t->first_head = record_tree(t->first_nodes, tree.headnode, [&](const node_t *node) {
         const contentflags_t &c = node->get_leafdata()->contents;
         const int32_t index = static_cast<int32_t>(t->first_leaves.size());
         t->first_leaves.push_back({c.seals_map(), -1, -1});
-        leaf_index[node] = index;
-        leaf_nodes.push_back(node);
+        leaf_nodes.push_back(const_cast<node_t *>(node));
         return index;
     });
+    for (size_t i = 0; i < leaf_nodes.size(); i++) {
+        leaf_nodes[i]->get_leafdata()->hullcache_index = static_cast<int32_t>(i);
+    }
 
     // label the connected areas of empty space through the portals, the way FillOutside
     // (LeafSealsMap) and FillDetail (LeafSealsForDetailFill) flood them
     auto label = [&](auto seals, int32_t h0_first_leaf_t::*area) {
         int32_t next = 0;
+        std::vector<const node_t *> stack;
         for (size_t i = 0; i < leaf_nodes.size(); i++) {
             if (t->first_leaves[i].*area >= 0 || seals(leaf_nodes[i]->get_leafdata()->contents)) {
                 continue;
             }
-            std::vector<const node_t *> stack{leaf_nodes[i]};
+            stack.push_back(leaf_nodes[i]);
             t->first_leaves[i].*area = next;
             while (!stack.empty()) {
                 const node_t *n = stack.back();
@@ -1047,20 +1051,23 @@ void hull0_store_first(tree_t &tree)
                         continue; // to outside_node
                     }
                     const node_t *other = p->nodes[side];
-                    auto it = leaf_index.find(other);
-                    if (it == leaf_index.end() || t->first_leaves[it->second].*area >= 0 ||
-                        seals(other->get_leafdata()->contents)) {
+                    // (portals join leaves of this tree: all of them have their index)
+                    const int32_t index = other->get_leafdata()->hullcache_index;
+                    if (t->first_leaves[index].*area >= 0 || seals(other->get_leafdata()->contents)) {
                         continue;
                     }
-                    t->first_leaves[it->second].*area = next;
+                    t->first_leaves[index].*area = next;
                     stack.push_back(other);
                 }
             }
             next++;
         }
     };
-    label([](const contentflags_t &c) { return c.seals_map(); }, &h0_first_leaf_t::outside_area);
+    // (two independent floods: each writes its own member)
+    tbb::task_group g;
+    g.run([&]() { label([](const contentflags_t &c) { return c.seals_map(); }, &h0_first_leaf_t::outside_area); });
     label([](const contentflags_t &c) { return c.is_any_solid() || c.is_sky(); }, &h0_first_leaf_t::detail_area);
+    g.wait();
 
     occupied_areas(*t, t->occupied_outside, t->occupied_detail);
     hull0_pending = std::move(t);
@@ -1072,6 +1079,7 @@ void hull0_store(tree_t &tree, mapentity_t &entity, const std::vector<std::share
     if (!is_enabled || (!bmodel && !hull0_pending)) {
         return;
     }
+    logging::funcheader();
     std::unique_ptr<hull0_t> t = bmodel ? std::make_unique<hull0_t>() : std::move(hull0_pending);
     t->bmodel = bmodel;
     if (bmodel) {

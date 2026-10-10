@@ -19,6 +19,7 @@
     See file, 'COPYING', for details.
 */
 
+#include <tbb/task_group.h>
 #include <cstring>
 #include <algorithm>
 
@@ -910,21 +911,45 @@ static bool IsTrigger(const mapentity_t &entity)
 // one walk for both statistics: the leaves' contents (counted locally and added to the stats once
 // per contents: the stats lock a mutex per call) and their heights (`height`: the number of nodes
 // from `node` up to the root, both included)
-static void CountLeafs_r(
-    node_t *node, int height, std::unordered_map<contents_t, size_t> &counts, int &max_height, double &sum_height)
+struct leaf_counts_t
+{
+    std::unordered_map<contents_t, size_t> counts;
+    int max_height = 0;
+    double sum_height = 0; // (a sum of integers: exact in any order)
+
+    void add(const leaf_counts_t &other)
+    {
+        for (auto &[flags, count] : other.counts) {
+            counts[flags] += count;
+        }
+        max_height = std::max(max_height, other.max_height);
+        sum_height += other.sum_height;
+    }
+};
+
+// The walk is mostly cache misses (the nodes are all over memory): its top levels run as tasks.
+static void CountLeafs_r(node_t *node, int height, int depth, leaf_counts_t &out)
 {
     if (auto *leafdata = node->get_leafdata()) {
-        counts[leafdata->contents.flags]++;
-        max_height = std::max(max_height, height);
-        sum_height += height;
+        out.counts[leafdata->contents.flags]++;
+        out.max_height = std::max(out.max_height, height);
+        out.sum_height += height;
         return;
     }
 
     auto *nodedata = node->get_nodedata();
-    CountLeafs_r(nodedata->children[0], height + 1, counts, max_height, sum_height);
-    CountLeafs_r(nodedata->children[1], height + 1, counts, max_height, sum_height);
+    if (depth < 10) {
+        leaf_counts_t front;
+        tbb::task_group g;
+        g.run([&]() { CountLeafs_r(nodedata->children[0], height + 1, depth + 1, front); });
+        CountLeafs_r(nodedata->children[1], height + 1, depth + 1, out);
+        g.wait();
+        out.add(front);
+    } else {
+        CountLeafs_r(nodedata->children[0], height + 1, depth + 1, out);
+        CountLeafs_r(nodedata->children[1], height + 1, depth + 1, out);
+    }
 }
-
 
 void CountLeafs(node_t *headnode)
 {
@@ -936,12 +961,14 @@ void CountLeafs(node_t *headnode)
         height++;
     }
 
-    std::unordered_map<contents_t, size_t> counts;
-    int max_height = 0;
-    double sum_height = 0;
-    size_t leafs = 0;
-    CountLeafs_r(headnode, height, counts, max_height, sum_height);
+    leaf_counts_t result;
+    CountLeafs_r(headnode, height, 0, result);
 
+    // (sorted: the same log whatever order the tasks merged in)
+    std::vector<std::pair<contents_t, size_t>> counts(result.counts.begin(), result.counts.end());
+    std::sort(counts.begin(), counts.end());
+
+    size_t leafs = 0;
     auto stats = content_stats_t();
     for (auto &[flags, count] : counts) {
         stats.count_contents_in_stats(contentflags_t{.flags = flags}, count);
@@ -951,8 +978,8 @@ void CountLeafs(node_t *headnode)
 
     // the heights of the tree at each leaf
     logging::stat_tracker_t stat_print;
-    stat_print.register_stat("max tree height").count += max_height;
-    stat_print.register_stat("avg tree height").count += static_cast<int>(sum_height / leafs);
+    stat_print.register_stat("max tree height").count += result.max_height;
+    stat_print.register_stat("avg tree height").count += static_cast<int>(result.sum_height / leafs);
 }
 
 static void GatherBspbrushes_r(node_t *node, bspbrush_t::container &container)
@@ -1008,6 +1035,11 @@ ProcessEntity
 */
 static void ProcessEntity(mapentity_t &entity, hull_index_t hullnum)
 {
+    // (the previous hull's trees may still be being freed: not more than that)
+    if (map.is_world_entity(entity)) {
+        WaitForDeferredFrees();
+    }
+
     /* No map brushes means non-bmodel entity.
        We need to handle worldspawn containing no brushes, though. */
     if (!entity.mapbrushes.size() && !map.is_world_entity(entity)) {
@@ -1819,6 +1851,7 @@ void ProcessFile()
 
     // create hulls!
     CreateHulls();
+    WaitForDeferredFrees();
     hullcache::print_summary();
     logging::bench_set_group("");
 

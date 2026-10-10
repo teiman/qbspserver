@@ -19,6 +19,8 @@
     See file, 'COPYING', for details.
 */
 
+#include <tbb/task_group.h>
+#include <atomic>
 #include <qbsp/outside.hh>
 #include <qbsp/brush.hh>
 #include <qbsp/map.hh>
@@ -101,18 +103,56 @@ static node_t *PointInLeaf(node_t *node, const qvec3d &point, bool prefer_sealin
     }
 }
 
-static void ClearOccupied_r(node_t *node)
+/*
+ * Calls fn(leaf) for every leaf under `node`. These walks are mostly cache misses (the nodes are
+ * all over memory), so the top levels run as tasks: fn must only touch its own leaf (or do
+ * order-independent writes).
+ */
+template<typename F>
+static void ForEachLeaf_Parallel(node_t *node, const F &fn, int depth = 0)
 {
     if (auto *nodedata = node->get_nodedata()) {
-        ClearOccupied_r(nodedata->children[0]);
-        ClearOccupied_r(nodedata->children[1]);
+        if (depth < 8) {
+            tbb::task_group g;
+            g.run([&]() { ForEachLeaf_Parallel(nodedata->children[0], fn, depth + 1); });
+            ForEachLeaf_Parallel(nodedata->children[1], fn, depth + 1);
+            g.wait();
+        } else {
+            ForEachLeaf_Parallel(nodedata->children[0], fn, depth + 1);
+            ForEachLeaf_Parallel(nodedata->children[1], fn, depth + 1);
+        }
         return;
     }
+    fn(node);
+}
 
-    auto *leafdata = node->get_leafdata();
-    leafdata->outside_distance = -1;
-    leafdata->occupied = 0;
-    leafdata->occupant = nullptr;
+// the same walk, for fn returning bool: how many leaves it returned true for
+template<typename F>
+static size_t CountLeaves_Parallel(node_t *node, const F &fn, int depth = 0)
+{
+    if (auto *nodedata = node->get_nodedata()) {
+        if (depth < 8) {
+            size_t front = 0;
+            tbb::task_group g;
+            g.run([&]() { front = CountLeaves_Parallel(nodedata->children[0], fn, depth + 1); });
+            const size_t back = CountLeaves_Parallel(nodedata->children[1], fn, depth + 1);
+            g.wait();
+            return front + back;
+        }
+        return CountLeaves_Parallel(nodedata->children[0], fn, depth + 1) +
+               CountLeaves_Parallel(nodedata->children[1], fn, depth + 1);
+    }
+    return fn(node) ? 1 : 0;
+}
+
+static void ClearOccupied_r(node_t *node)
+{
+    ForEachLeaf_Parallel(node, [](node_t *leaf) {
+        auto *leafdata = leaf->get_leafdata();
+        leafdata->outside_distance = -1;
+        leafdata->occupied = 0;
+        leafdata->occupant = nullptr;
+    });
 }
 
 static bool OutsideFill_Passable(const portal_t *p)
@@ -190,6 +230,8 @@ static void FloodFillLeafsFromVoid(tree_t &tree)
                 continue;
 
             node_t *neighbour = portal->nodes[side];
+            if (neighbour->get_leafdata()->outside_distance != -1)
+                continue; // visited (it would be skipped when popped)
             queue.emplace_back(neighbour, outside_distance + 1);
         }
     }
@@ -375,11 +417,22 @@ static void MarkOccupiedLeafs(node_t *headnode, hull_index_t hullnum)
     }
 }
 
-static void FindOccupiedLeafs_R(node_t *node, std::vector<node_t *> &result)
+// (in tree order: the top levels run as tasks, and their results are joined in order)
+static void FindOccupiedLeafs_R(node_t *node, std::vector<node_t *> &result, int depth = 0)
 {
     if (auto *nodedata = node->get_nodedata()) {
-        FindOccupiedLeafs_R(nodedata->children[0], result);
-        FindOccupiedLeafs_R(nodedata->children[1], result);
+        if (depth < 8) {
+            std::vector<node_t *> front, back;
+            tbb::task_group g;
+            g.run([&]() { FindOccupiedLeafs_R(nodedata->children[0], front, depth + 1); });
+            FindOccupiedLeafs_R(nodedata->children[1], back, depth + 1);
+            g.wait();
+            result.insert(result.end(), front.begin(), front.end());
+            result.insert(result.end(), back.begin(), back.end());
+        } else {
+            FindOccupiedLeafs_R(nodedata->children[0], result, depth + 1);
+            FindOccupiedLeafs_R(nodedata->children[1], result, depth + 1);
+        }
         return;
     }
 
@@ -427,15 +480,8 @@ MarkVisibleBrushSides
 Set f->touchesOccupiedLeaf=true on faces that are touching occupied leafs
 ==================
 */
-static void MarkVisibleBrushSides_R(node_t *node)
+static void MarkVisibleBrushSides_Leaf(node_t *node)
 {
-    // descent to leafs
-    if (auto *nodedata = node->get_nodedata()) {
-        MarkVisibleBrushSides_R(nodedata->children[0]);
-        MarkVisibleBrushSides_R(nodedata->children[1]);
-        return;
-    }
-
     if (LeafSealsForDetailFill(node)) {
         // this leaf is opaque
         return;
@@ -460,7 +506,8 @@ static void MarkVisibleBrushSides_R(node_t *node)
                     if (side.source && qv::epsilonEqual(side.get_positive_plane(), portal->plane)) {
                         // we've found a brush side in an original brush in the neighbouring
                         // leaf, on a portal to this (non-opaque) leaf, so mark it as visible.
-                        side.source->visible = true;
+                        // (leaves run in parallel: only ever set to true, so the order doesn't matter)
+                        std::atomic_ref<bool>(side.source->visible).store(true, std::memory_order_relaxed);
                     }
                 }
             }
@@ -470,6 +517,11 @@ static void MarkVisibleBrushSides_R(node_t *node)
     }
 }
 
+static void MarkVisibleBrushSides_R(node_t *node)
+{
+    ForEachLeaf_Parallel(node, MarkVisibleBrushSides_Leaf);
+}
+
 //=============================================================================
 
 struct outleafs_stats_t : logging::stat_tracker_t
@@ -477,35 +529,34 @@ struct outleafs_stats_t : logging::stat_tracker_t
     stat &outleafs = register_stat("outside leaves");
 };
 
-static void OutLeafsToSolid_R(node_t *node, settings::filltype_t filltype, outleafs_stats_t &stats)
+static bool OutLeafToSolid(node_t *node, settings::filltype_t filltype)
 {
-    if (auto *nodedata = node->get_nodedata()) {
-        OutLeafsToSolid_R(nodedata->children[0], filltype, stats);
-        OutLeafsToSolid_R(nodedata->children[1], filltype, stats);
-        return;
-    }
-
     auto *leafdata = node->get_leafdata();
 
     // skip leafs reachable from entities
     if (filltype == settings::filltype_t::INSIDE) {
         if (leafdata->occupied > 0) {
-            return;
+            return false;
         }
     } else {
         if (leafdata->outside_distance == -1) {
-            return;
+            return false;
         }
     }
 
     // Don't fill sky, or count solids as outleafs
     if (leafdata->contents.seals_map()) {
-        return;
+        return false;
     }
 
     // Finally, we can fill it in as void.
     leafdata->contents = contentflags_t::make(EWT_VISCONTENTS_SOLID);
-    stats.outleafs++;
+    return true;
+}
+
+static void OutLeafsToSolid_R(node_t *node, settings::filltype_t filltype, outleafs_stats_t &stats)
+{
+    stats.outleafs += CountLeaves_Parallel(node, [&](node_t *leaf) { return OutLeafToSolid(leaf, filltype); });
 }
 
 struct detail_filled_leafs_stats_t : logging::stat_tracker_t
@@ -513,29 +564,28 @@ struct detail_filled_leafs_stats_t : logging::stat_tracker_t
     stat &filledleafs = register_stat("detail filled leafs", true);
 };
 
-static void FillDetailEnclosedLeafsToDetailSolid_R(node_t *node, detail_filled_leafs_stats_t &stats)
+static bool FillDetailEnclosedLeafToDetailSolid(node_t *node)
 {
-    if (auto *nodedata = node->get_nodedata()) {
-        FillDetailEnclosedLeafsToDetailSolid_R(nodedata->children[0], stats);
-        FillDetailEnclosedLeafsToDetailSolid_R(nodedata->children[1], stats);
-        return;
-    }
-
     auto *leafdata = node->get_leafdata();
 
     // skip leafs reachable from entities
     if (leafdata->occupied > 0) {
-        return;
+        return false;
     }
 
     // Don't fill sky, or count solids as outleafs
     if (LeafSealsForDetailFill(node)) {
-        return;
+        return false;
     }
 
     // Finally, we can fill it in as detail solid.
     leafdata->contents = contentflags_t::create_detail_solid_contents(contentflags_t::make(EWT_VISCONTENTS_SOLID));
-    stats.filledleafs++;
+    return true;
+}
+
+static void FillDetailEnclosedLeafsToDetailSolid_R(node_t *node, detail_filled_leafs_stats_t &stats)
+{
+    stats.filledleafs += CountLeaves_Parallel(node, FillDetailEnclosedLeafToDetailSolid);
 }
 
 //=============================================================================
@@ -589,6 +639,8 @@ static void BFSFloodFillFromOccupiedLeafs(
                     continue;
 
                 node_t *neighbour = portal->nodes[side];
+                if (neighbour->get_leafdata()->occupied != 0)
+                    continue; // visited (it would be skipped when popped)
                 queue.push_back(std::make_pair(neighbour, dist + 1));
             }
         }
