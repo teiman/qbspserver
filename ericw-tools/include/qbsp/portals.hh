@@ -25,6 +25,8 @@
 #include <qbsp/brush.hh>
 #include <qbsp/qbsp.hh>
 
+#include <tbb/concurrent_vector.h>
+
 #include <atomic>
 #include <memory>
 
@@ -59,6 +61,87 @@ struct buildportal_t
     // .front/.back side of planenum
     twosided<node_t *> nodes = {nullptr, nullptr};
     winding_t winding;
+    // the next piece in its buildportal_list_t
+    buildportal_t *next = nullptr;
+};
+
+/*
+ * The pieces of portal while a tree is portalized live in a pool (for one MakeTreePortals /
+ * WritePortalFile), and lists of them are chains through `next`: splitting and joining lists
+ * (order kept, like std::list's splice) allocates nothing. A std::list node per piece was ~5% of
+ * qbsp's time in allocations.
+ */
+struct buildportal_pool_t
+{
+    tbb::concurrent_vector<buildportal_t> pieces; // (thread-safe growth; elements never move)
+
+    buildportal_t *make() { return &*pieces.emplace_back(); }
+};
+
+struct buildportal_list_t
+{
+    buildportal_t *head = nullptr;
+    buildportal_t *tail = nullptr;
+
+    buildportal_list_t() = default;
+    buildportal_list_t(const buildportal_list_t &) = delete;
+    buildportal_list_t &operator=(const buildportal_list_t &) = delete;
+    buildportal_list_t(buildportal_list_t &&other) noexcept : head(other.head), tail(other.tail)
+    {
+        other.head = other.tail = nullptr;
+    }
+    buildportal_list_t &operator=(buildportal_list_t &&other) noexcept
+    {
+        head = other.head;
+        tail = other.tail;
+        other.head = other.tail = nullptr;
+        return *this;
+    }
+
+    bool empty() const { return head == nullptr; }
+
+    void push_back(buildportal_t *p)
+    {
+        p->next = nullptr;
+        if (tail) {
+            tail->next = p;
+        } else {
+            head = p;
+        }
+        tail = p;
+    }
+
+    // moves all of `other` to the end of this list
+    void splice(buildportal_list_t &other)
+    {
+        if (!other.head) {
+            return;
+        }
+        if (tail) {
+            tail->next = other.head;
+        } else {
+            head = other.head;
+        }
+        tail = other.tail;
+        other.head = other.tail = nullptr;
+    }
+
+    // (reads the next piece before the current one is visited: the loop may move the current piece
+    // to another list)
+    struct iterator
+    {
+        buildportal_t *cur, *nxt;
+        buildportal_t &operator*() const { return *cur; }
+        iterator &operator++()
+        {
+            cur = nxt;
+            nxt = cur ? cur->next : nullptr;
+            return *this;
+        }
+        bool operator!=(const iterator &other) const { return cur != other.cur; }
+    };
+    iterator begin() const { return {head, head ? head->next : nullptr}; }
+    iterator end() const { return {nullptr, nullptr}; }
 };
 
 struct portalstats_t : logging::stat_tracker_t
@@ -75,10 +158,10 @@ enum class portaltype_t
     TREE,
     VIS
 };
-std::list<buildportal_t> MakeTreePortals_r(node_t *node, portaltype_t type, std::list<buildportal_t> boundary_portals,
-    portalstats_t &stats, logging::percent_clock &clock);
+buildportal_list_t MakeTreePortals_r(node_t *node, portaltype_t type, buildportal_list_t boundary_portals,
+    buildportal_pool_t &pool, portalstats_t &stats, logging::percent_clock &clock);
 void MakeTreePortals(tree_t &tree);
-std::list<buildportal_t> MakeHeadnodePortals(tree_t &tree);
-void MakePortalsFromBuildportals(tree_t &tree, std::list<buildportal_t> &buildportals);
+buildportal_list_t MakeHeadnodePortals(tree_t &tree, buildportal_pool_t &pool);
+void MakePortalsFromBuildportals(tree_t &tree, buildportal_list_t &buildportals);
 void EmitAreaPortals(tree_t &tree);
 void MarkVisibleSides(tree_t &tree, bspbrush_t::container &brushes);

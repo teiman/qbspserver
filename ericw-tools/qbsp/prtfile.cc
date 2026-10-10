@@ -227,14 +227,15 @@ void WritePortalFile(tree_t &tree)
 
     FreeTreePortals(tree);
 
-    MakeHeadnodePortals(tree);
+    buildportal_pool_t pool;
+    MakeHeadnodePortals(tree, pool);
 
     {
         logging::percent_clock clock;
 
         // vis portal generation doesn't use headnode portals
         portalstats_t stats{};
-        auto buildportals = MakeTreePortals_r(tree.headnode, portaltype_t::VIS, {}, stats, clock);
+        auto buildportals = MakeTreePortals_r(tree.headnode, portaltype_t::VIS, {}, pool, stats, clock);
 
         MakePortalsFromBuildportals(tree, buildportals);
 

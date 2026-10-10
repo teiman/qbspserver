@@ -1280,7 +1280,7 @@ static void cell_preorder(node_t *node, std::vector<node_t *> &out)
     }
 }
 
-bool cell_internal_portals(cell_t &cell, node_t *node, std::list<buildportal_t> &out)
+bool cell_internal_portals(cell_t &cell, node_t *node, buildportal_pool_t &pool, buildportal_list_t &out)
 {
     if (!cell.has_portals) {
         return false;
@@ -1291,10 +1291,11 @@ bool cell_internal_portals(cell_t &cell, node_t *node, std::list<buildportal_t> 
     for (auto &p : cell.portals) {
         if (p.onnode >= static_cast<int32_t>(nodes.size()) || p.nodes[0] >= static_cast<int32_t>(nodes.size()) ||
             p.nodes[1] >= static_cast<int32_t>(nodes.size())) {
-            out.clear();
+            out = {}; // (the pieces made so far stay unused in the pool)
             return false; // not the subtree these portals were made for
         }
-        buildportal_t &b = out.emplace_back();
+        buildportal_t &b = *pool.make();
+        out.push_back(&b);
         b.plane = p.plane;
         b.onnode = nodes[p.onnode];
         b.nodes = {nodes[p.nodes[0]], nodes[p.nodes[1]]};
@@ -1303,7 +1304,7 @@ bool cell_internal_portals(cell_t &cell, node_t *node, std::list<buildportal_t> 
     return true;
 }
 
-void cell_remember_portals(cell_t &cell, node_t *node, const std::list<buildportal_t> &portals)
+void cell_remember_portals(cell_t &cell, node_t *node, const buildportal_list_t &portals)
 {
     std::vector<node_t *> nodes;
     cell_preorder(node, nodes);

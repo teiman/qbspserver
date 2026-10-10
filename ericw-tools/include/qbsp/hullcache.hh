@@ -24,6 +24,8 @@ struct node_t;
 struct tree_t;
 struct bspbrush_t;
 struct buildportal_t;
+struct buildportal_list_t;
+struct buildportal_pool_t;
 
 /*
  * The clipping hulls (1, 2...) are most of a compile's time, and they only depend on the
@@ -113,9 +115,9 @@ struct cell_t;
 // the cell whose root is `node` in the tree being portalized, or nullptr
 cell_t *portal_cell(const node_t *node);
 // the stored portals between two leaves of the cell; false if the cell has none stored yet
-bool cell_internal_portals(cell_t &cell, node_t *node, std::list<buildportal_t> &out);
+bool cell_internal_portals(cell_t &cell, node_t *node, buildportal_pool_t &pool, buildportal_list_t &out);
 // after portalizing a cell normally: keep its internal portals
-void cell_remember_portals(cell_t &cell, node_t *node, const std::list<buildportal_t> &portals);
+void cell_remember_portals(cell_t &cell, node_t *node, const buildportal_list_t &portals);
 void cell_portals_done();
 
 /*
