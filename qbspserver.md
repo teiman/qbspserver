@@ -365,6 +365,23 @@ qbspreceive [-port N] mapname[.map]
 
 `qbspserver` takes the same options as `qbsp`, and uses them for every compile.
 
+### Testing by hand: E1M1
+
+The `.bat` files default to `testmap\e1m1.map`, id's E1M1 from ericw-tools' test maps (`E1M1-edited-ents.map`: the original geometry, with more monsters). Its textures (`gfx/base.wad`) aren't in the repository; take them from your Quake once, out of the game's own E1M1:
+
+```
+python tools\wadfrombsp.py D:\quake\id1\pak0.pak:maps/e1m1.bsp testmap\gfx\base.wad
+```
+
+Then (build first: `build.bat qbspserver`, `qbspreceive`, `vis`, `light`):
+
+1. `server.bat`: leave it open (the first compile takes a moment).
+2. Edit `testmap\e1m1.map` in the editor and save.
+3. `receive.bat`: compiles through the server (under a second on E1M1).
+4. `play.bat`: runs `vis` and `light` (about 2 s; `set NOLIGHT=1` skips them), copies the map to `D:\quake\qbspserver\maps` and starts ironwail on it (`set QUAKE=...` for another Quake folder).
+
+Repeat 2-4. Two warnings are the map's own: a brush with both sky and solid faces, and `skip` not being in the wad (skip faces aren't drawn).
+
 ## Status
 
 1. **Done: client/server.** Both programs, the protocol, log streaming and exit codes. Each request still runs a **full** `qbsp` compile in the server process (`InitQBSP` + `ProcessFile`, like `qbsp` itself).

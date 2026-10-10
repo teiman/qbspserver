@@ -1,16 +1,17 @@
 @echo off
-rem Copies the compiled map to the game folder and opens it in ironwail.
-rem   play.bat                            -> testmap\gridtest.bsp
+rem Lights the compiled map (vis + light), copies it to the game folder and opens it in ironwail.
+rem   play.bat                            -> testmap\e1m1.bsp
 rem   play.bat path\to\mymap.map          -> another map (its .bsp, and .lit if any, next to the .map)
 rem   set QUAKE=D:\quake                  -> Quake folder (default D:\quake)
 rem   set GAME=qbspserver                 -> game folder inside it (default qbspserver; id1 is the fallback)
-rem Run server.bat + receive.bat (or qbsp) first. The map has no light unless you run light on it.
+rem   set NOLIGHT=1                       -> skip vis and light (the map shows fully bright)
+rem Run server.bat + receive.bat (or qbsp) first.
 setlocal
 if not defined QUAKE set QUAKE=D:\quake
 if not defined GAME set GAME=qbspserver
 set ROOT=%~dp0
 set MAP=%~1
-if "%MAP%"=="" set MAP=%ROOT%testmap\gridtest.map
+if "%MAP%"=="" set MAP=%ROOT%testmap\e1m1.map
 for %%F in ("%MAP%") do (
     set BSP=%%~dpnF.bsp
     set LIT=%%~dpnF.lit
@@ -24,6 +25,14 @@ if not exist "%BSP%" (
 if not exist "%QUAKE%\ironwail.exe" (
     echo [play] Missing %QUAKE%\ironwail.exe: set QUAKE to your Quake folder
     exit /b 1
+)
+
+rem vis and light, when built (build.bat vis / build.bat light): a couple of seconds on e1m1
+set VIS=%ROOT%ericw-tools\build-windows\vis\Release\vis.exe
+set LIGHT=%ROOT%ericw-tools\build-windows\light\Release\vklight.exe
+if not defined NOLIGHT (
+    if exist "%VIS%" ("%VIS%" "%BSP%" >nul || echo [play] vis failed, playing without it) else (echo [play] no vis.exe: build.bat vis)
+    if exist "%LIGHT%" ("%LIGHT%" "%BSP%" >nul || echo [play] light failed, playing without it) else (echo [play] no vklight.exe: build.bat light)
 )
 
 if not exist "%QUAKE%\%GAME%\maps" mkdir "%QUAKE%\%GAME%\maps"
